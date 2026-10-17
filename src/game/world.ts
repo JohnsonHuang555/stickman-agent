@@ -36,6 +36,8 @@ const BOSS_BANNER_FRAMES = 150
 const POPUP_FRAMES = 50
 /** 每次命中的基本分，乘上連擊倍率。 */
 const HIT_SCORE = 10
+/** 被打飛撞到牆時的額外傷害。 */
+const WALL_BOUNCE_DAMAGE = 6
 const MUZZLE_FRAMES = 5
 /** 自動撿起醫療箱、分數道具的距離。 */
 const CONSUME_REACH = 12
@@ -462,6 +464,30 @@ export class World {
 
   private get fighters(): Fighter[] {
     return [this.agent, ...this.enemies]
+  }
+
+  /** 牆的位置：鎖定區段時是畫面左右邊緣，否則是樓層兩端。 */
+  wallBounds(): { left: number; right: number } {
+    const lock = this.director?.lockLeft
+    if (lock !== null && lock !== undefined) return { left: lock + 8, right: lock + VIEW_W - 8 }
+    return { left: 8, right: this.floorWidth - 8 }
+  }
+
+  /** 被打飛的雜兵撞到牆：額外受傷、震動畫面、牆邊揚起碎屑，算一次連擊。 */
+  wallBounce(g: Grunt, side: Facing): void {
+    const wasAlive = !g.life.isDead
+    g.life.damage(WALL_BOUNCE_DAMAGE)
+    g.flash = 4
+    this.burst(g.x + side * 6, GROUND_Y - g.h - 20, '#d8d0c0')
+    this.hitstop = Math.max(this.hitstop, 5)
+    this.quake(4)
+    this.sound('heavyHit')
+    this.combo.hit(this.realFrame)
+    this.score += HIT_SCORE * this.combo.multiplier
+    if (wasAlive && g.life.isDead) {
+      this.score += g.score
+      this.sound('ko')
+    }
   }
 
   /** 這個位置附近有沒有正在浮空的雜兵（決定空中連段輔助要不要啟用）。 */

@@ -1,9 +1,13 @@
 import type { ActionDef } from '../combat/types'
 import type { Fighter } from '../fighter'
-import { Clip } from '../stickman/clip'
+import { Clip, still } from '../stickman/clip'
 import { ATTACK_POSES, POSES, aerialClip, attackClip } from '../stickman/poses'
 
 const DESPERATION_COST = 8
+/** 翻滾：持續幀數、無敵幀數、初速（約滾 60px）。 */
+const ROLL_FRAMES = 18
+const ROLL_INVULN = 16
+const ROLL_SPEED = 4.6
 
 /** 出拳時往前小踏一步，讓連擊跟得上被打退的敵人。 */
 const punchStep = (f: Fighter, frame: number) => {
@@ -53,6 +57,19 @@ export const MOVES = {
     // 出腿時往前小跨一步
     tick: (f, frame) => {
       f.vx = frame >= 4 && frame <= 9 ? f.facing * 1.4 : 0
+    },
+  },
+  /** ↓+空白：往前翻滾，途中短暫無敵，可以穿過敵人。 */
+  roll: {
+    clip: still(POSES.tuck),
+    length: ROLL_FRAMES + 4,
+    onStart: (f) => {
+      f.invuln = ROLL_INVULN
+    },
+    tick: (f, frame) => {
+      f.vx = frame <= ROLL_FRAMES ? f.facing * ROLL_SPEED * (1 - frame / (ROLL_FRAMES * 1.6)) : 0
+      // 整個身體轉一圈
+      f.rotation = frame < ROLL_FRAMES ? f.facing * Math.PI * 2 * (frame / ROLL_FRAMES) : 0
     },
   },
   /** ↑+Z：上勾拳把雜兵打上空中；收招時可按跳取消，跳起來追擊。 */

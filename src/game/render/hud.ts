@@ -176,7 +176,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  V 背包  ↑Z 挑空  ↓空中Z 下砸  Z+X+C 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
+  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  V 背包  ↑Z 挑空  ↓空中Z 下砸  ↓空白 翻滾  Z+X+C 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
 
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'

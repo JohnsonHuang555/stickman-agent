@@ -1,4 +1,5 @@
 import type { ActionDef, ActionInstance, ActiveHit, Box, HitSpec } from '../combat/types'
+import { GROUND_Y } from '../constants'
 import { Fighter } from '../fighter'
 import type { Button, InputBuffer, InputSnapshot } from '../input/buttons'
 import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, type Facing } from '../input/commands'
@@ -21,6 +22,10 @@ const AIR_DRIFT = 2.2
 const AIR_STEER = 0.15
 /** 空中連段輔助：空中招式起手時往上帶的速度。 */
 const AIR_RISE = 1.4
+/** 蹬牆跳：離牆多近算貼著牆、往外跳的水平速度與起跳速度。 */
+const WALL_TOUCH = 3
+const WALL_JUMP_SPEED = 2.8
+const WALL_JUMP_VELOCITY = 6.2
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
 const COMMAND_BUFFER = 10
 const JUMP_BUFFER = 8
@@ -66,6 +71,8 @@ export class Agent extends Fighter {
   private airAttackUsed = false
   /** 附近有浮空的敵人：空中招式會懸停、往上帶（空中連段輔助）。 */
   private juggleAssist = false
+  /** 上一次蹬的是哪一面牆（-1 左、1 右）；落地後重設。 */
+  private lastWallSide: -1 | 0 | 1 = 0
   /** 空中連段收招後的寬限期：這段時間內按 on 仍可接 next。 */
   private airChain: { next: MoveId; on: string; frames: number } | null = null
   private hitstun = 0
@@ -139,6 +146,8 @@ export class Agent extends Fighter {
     }
 
     if (this.applyPhysics(world)) this.onLand()
+    // 只有翻滾時身體會旋轉；被打斷或做別的動作時立刻轉正
+    if (this.state !== 'action' || this.act?.def !== MOVES.roll) this.rotation = 0
   }
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
@@ -149,6 +158,7 @@ export class Agent extends Fighter {
       world.useBag(this)
     }
     if (this.airborne) {
+      if (this.jumpUntil >= now && this.tryWallJump(world)) return
       this.steerInAir()
       return
     }
@@ -173,7 +183,13 @@ export class Agent extends Fighter {
     const dir = this.heldDir()
     if (this.jumpUntil >= now && !this.carryingHeavy) {
       this.jumpUntil = -1
-      this.startJump(dir)
+      // ↓+空白：翻滾（往按著的方向，沒按就往面對的方向）
+      if (this.buttons.has('down')) {
+        if (dir) this.facing = dir
+        this.startAction(MOVES.roll)
+      } else {
+        this.startJump(dir)
+      }
       return
     }
 
@@ -286,6 +302,27 @@ export class Agent extends Fighter {
     if (dir) this.vx += (dir * AIR_DRIFT - this.vx) * AIR_STEER
   }
 
+  /**
+   * 蹬牆跳：在空中貼著牆按跳，往反方向跳出，並可以再出一次空中招式。
+   * 不能連續蹬同一面牆（左右交替可以）。
+   */
+  private tryWallJump(world: World): boolean {
+    const { left, right } = world.wallBounds()
+    const side = this.x <= left + WALL_TOUCH ? -1 : this.x >= right - WALL_TOUCH ? 1 : 0
+    if (!side || side === this.lastWallSide) return false
+    this.jumpUntil = -1
+    this.lastWallSide = side
+    const away = -side as Facing
+    this.facing = away
+    this.vx = away * WALL_JUMP_SPEED
+    this.vh = WALL_JUMP_VELOCITY
+    this.airAttackUsed = false
+    this.airChain = null
+    world.burst(this.x + side * 4, GROUND_Y - this.h - 10, '#d8d0c0')
+    world.sound('throw')
+    return true
+  }
+
   private startJump(dir: -1 | 0 | 1): void {
     if (dir) this.facing = dir
     this.vx = dir * AIR_DRIFT
@@ -310,6 +347,7 @@ export class Agent extends Fighter {
 
   private onLand(): void {
     this.airChain = null
+    this.lastWallSide = 0
     this.airAttackUsed = false
     this.vx = 0
     if (this.state === 'launched') {
@@ -348,7 +386,7 @@ export class Agent extends Fighter {
 
   hurtbox(): Box | null {
     if (this.state === 'down' || this.state === 'getup') return null
-    if (this.crouching || this.act?.def === MOVES.sweep) return this.bodyBox(CROUCH_HEIGHT)
+    if (this.crouching || this.act?.def === MOVES.sweep || this.act?.def === MOVES.roll) return this.bodyBox(CROUCH_HEIGHT)
     return this.bodyBox(this.airborne ? STAND_HEIGHT - 4 : STAND_HEIGHT)
   }
 

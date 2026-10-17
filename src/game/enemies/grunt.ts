@@ -32,6 +32,9 @@ const JUGGLE_RISE_GRAVITY = 0.22
 const JUGGLE_FALL_GRAVITY = 0.3
 const SPIKE_VELOCITY = -6
 const SPIKE_BOUNCE = 3.2
+/** 被打飛的水平速度至少這麼快，撞到牆才會反彈。 */
+const WALL_BOUNCE_MIN_SPEED = 1.6
+const WALL_BOUNCE_LIFT = 2.6
 
 /** 被擊飛的雜兵撞到同伴時造成的傷害。 */
 const BUMP: HitSpec = {
@@ -97,6 +100,8 @@ export class Grunt extends Enemy {
   private spiked = false
   /** 翻滾的角速度（弧度／幀）。 */
   private spin = 0
+  /** 這次被打飛已經撞過牆。 */
+  private wallBounced = false
   private target: ItemEntity | null = null
   /** 每個雜兵徘徊距離略有不同，避免疊在一起。 */
   private readonly hoverJitter = rand(-10, 25)
@@ -226,8 +231,35 @@ export class Grunt extends Enemy {
         this.rotation = 0
         this.spin = 0
         this.setState('down')
+        this.wallBounced = false
         this.vx *= 0.4
       }
+    }
+    this.checkWallBounce(world)
+  }
+
+  /**
+   * 被打飛撞到牆：彈回來、額外受傷，並變成可以追打的浮空狀態。
+   * 每次被打飛只會彈一次，避免在牆邊無限連打。
+   */
+  private checkWallBounce(world: World): void {
+    if (this.wallBounced || !this.airborne) return
+    if (this.state !== 'launched' && this.state !== 'juggled') return
+    if (Math.abs(this.vx) < WALL_BOUNCE_MIN_SPEED) return
+    if (world.director?.lockLeft != null && !this.entered) return // 還沒走進鎖定畫面的不算
+    const { left, right } = world.wallBounds()
+    const side: Facing | 0 = this.vx < 0 && this.x <= left ? -1 : this.vx > 0 && this.x >= right ? 1 : 0
+    if (!side) return
+    this.x = side < 0 ? left : right
+    this.wallBounced = true
+    this.spiked = false
+    this.vx = -this.vx * 0.5
+    this.vh = Math.max(this.vh, WALL_BOUNCE_LIFT)
+    this.spin = -this.spin
+    world.wallBounce(this, side)
+    if (!this.life.isDead) {
+      this.setState('juggled')
+      this.juggleHits = JUGGLE_LIMIT - 2 // 撞牆後還能再追打兩下
     }
   }
 
