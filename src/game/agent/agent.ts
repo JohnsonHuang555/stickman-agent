@@ -59,6 +59,7 @@ export class Agent extends Fighter {
   private buffered: { cmd: Command; until: number } | null = null
   private jumpUntil = -1
   private grabUntil = -1
+  private grabAt = -1
   private bagUntil = -1
   private crouching = false
   private walking = false
@@ -87,7 +88,12 @@ export class Agent extends Fighter {
     })
     if (cmd) this.buffered = { cmd, until: realFrame + COMMAND_BUFFER }
     if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
-    if (snapshot.pressed.includes('grab')) this.grabUntil = realFrame + COMMAND_BUFFER
+    if (snapshot.pressed.includes('grab')) {
+      this.grabUntil = realFrame + COMMAND_BUFFER
+      this.grabAt = realFrame
+    }
+    // 保命招用到 C：取消這次的撿丟
+    if (cmd?.kind === 'desperation') this.grabUntil = -1
     if (snapshot.pressed.includes('bag')) this.bagUntil = realFrame + COMMAND_BUFFER
   }
 
@@ -147,7 +153,8 @@ export class Agent extends Fighter {
       return
     }
 
-    if (this.grabUntil >= now) {
+    // C 延遲 SIMULTANEOUS_WINDOW 幀才撿丟：這段時間內湊成 Z+X+C 就改放保命招
+    if (this.grabUntil >= now && now - this.grabAt >= SIMULTANEOUS_WINDOW) {
       this.grabUntil = -1
       // 拿著槍時，腳邊的彈藥包優先於丟出
       const item = world.pickupCandidate(this)

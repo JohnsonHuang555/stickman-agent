@@ -31,23 +31,29 @@ describe('recognizeCommand', () => {
     expect(recognize([press('kick', 10)], 10)?.kind).toBe('kick')
   })
 
-  it('z + x on the same frame is the desperation move', () => {
-    expect(recognize([press('punch', 10), press('kick', 10)], 10)?.kind).toBe('desperation')
+  it('z + x + c on the same frame is the desperation move', () => {
+    const presses = [press('punch', 10), press('kick', 10), press('grab', 10)]
+    expect(recognize(presses, 10)?.kind).toBe('desperation')
   })
 
-  it('z then x within the simultaneous window is still the desperation move', () => {
-    const presses = [press('punch', 10), press('kick', 10 + SIMULTANEOUS_WINDOW)]
-    expect(recognize(presses, 10 + SIMULTANEOUS_WINDOW)?.kind).toBe('desperation')
+  it('z + x without c is just a kick (no more accidental desperation moves)', () => {
+    expect(recognize([press('punch', 10), press('kick', 10)], 10)?.kind).toBe('kick')
   })
 
-  it('z then x while z is still held is the desperation move', () => {
-    const presses = [press('punch', 10), press('kick', 12)]
-    expect(recognize(presses, 12, { held: ['punch', 'kick'] })?.kind).toBe('desperation')
+  it('the three keys pressed within the window, all still held, is the desperation move — whichever comes last', () => {
+    const w = SIMULTANEOUS_WINDOW
+    const held: Button[] = ['punch', 'kick', 'grab']
+    expect(recognize([press('punch', 10), press('kick', 11), press('grab', 10 + w)], 10 + w, { held })?.kind).toBe('desperation')
+    expect(recognize([press('grab', 10), press('punch', 11), press('kick', 10 + w)], 10 + w, { held })?.kind).toBe('desperation')
   })
 
-  it('tapping z then x (z already released) is just a kick, even within the window', () => {
-    const presses = [press('punch', 10), press('kick', 12)]
-    expect(recognize(presses, 12, { held: ['kick'] })?.kind).toBe('kick')
+  it('if one of the three was already released, it is not the desperation move', () => {
+    const presses = [press('punch', 10), press('grab', 11), press('kick', 12)]
+    expect(recognize(presses, 12, { held: ['grab', 'kick'] })?.kind).toBe('kick')
+  })
+
+  it('c alone is not an attack command (it is pick up / throw)', () => {
+    expect(recognize([press('grab', 10)], 10)).toBeNull()
   })
 
   it('z then x outside the window is just a kick', () => {
@@ -65,8 +71,9 @@ describe('recognizeCommand', () => {
     expect(recognize([press('punch', 10)], 10, { up: true })?.kind).toBe('launcher')
   })
 
-  it('up + z + x is still the desperation move', () => {
-    expect(recognize([press('punch', 10), press('kick', 10)], 10, { up: true })?.kind).toBe('desperation')
+  it('up + z + x + c is still the desperation move', () => {
+    const presses = [press('punch', 10), press('kick', 10), press('grab', 10)]
+    expect(recognize(presses, 10, { up: true })?.kind).toBe('desperation')
   })
 
   it('no desperation move in the air', () => {

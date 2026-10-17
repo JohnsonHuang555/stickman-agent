@@ -49,7 +49,7 @@ _Avoid_: 補包、食物、health pack
 _Avoid_: 技能、skill
 
 **保命招 (Desperation Move)**:
-z+x 同時按出的原地旋風腿，攻擊四周但消耗特務自身少量血量。
+Z+X+C 三鍵同時壓住放出的原地旋風腿，攻擊四周但消耗特務自身少量血量。
 _Avoid_: 大招、炸彈
 
 **三段拳 (Punch Chain)**:

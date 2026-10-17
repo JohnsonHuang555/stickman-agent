@@ -88,13 +88,14 @@ describe('melee weapons', () => {
     expect(agent.held).toBeNull()
   })
 
-  it('holding a weapon disables special moves: z + x just swings, no life cost', () => {
+  it('holding a weapon disables special moves: z + x + c just swings — no life cost, and the weapon is not thrown', () => {
     const { world, agent, grunt } = setup([18])
     agent.held = newItem('bat')
-    tick(world, ['punch', 'kick'])
+    tick(world, ['punch', 'kick', 'grab'])
     run(world, 40)
     expect(agent.life.hp).toBe(agent.life.max)
     expect(damageOf(grunt)).toBe(14)
+    expect(agent.held?.type).toBe('bat')
   })
 
   it('x still kicks while holding a weapon', () => {

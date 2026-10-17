@@ -19,8 +19,9 @@ export interface Command {
   dir?: Facing
 }
 
-/** z、x 視為「同時按」的幀數容許（約 50ms）。 */
+/** 保命招（Z＋X＋C）視為「同時按」的幀數容許（約 50ms）。 */
 export const SIMULTANEOUS_WINDOW = 3
+const DESPERATION_BUTTONS: readonly Button[] = ['punch', 'kick', 'grab']
 /** 雙擊方向鍵的間隔上限，以及第二擊到出拳的間隔上限。 */
 export const DOUBLE_TAP_WINDOW = 14
 
@@ -33,7 +34,7 @@ export interface CommandContext {
   up?: boolean
   /** 正按著 ↓（空中下砸拳）。 */
   down?: boolean
-  /** 目前壓著的按鍵；保命招需要兩鍵同時壓住。省略時不檢查。 */
+  /** 目前壓著的按鍵；保命招需要三鍵同時壓住。省略時不檢查。 */
   held?: ReadonlySet<Button>
 }
 
@@ -42,22 +43,23 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   const pressedNow = (b: Button) => ctx.presses.some((p) => p.button === b && p.frame === ctx.frame)
   const punch = pressedNow('punch')
   const kick = pressedNow('kick')
-  if (!punch && !kick) return null
+  const grab = pressedNow('grab')
+  if (!punch && !kick && !grab) return null
 
   // 空中：X 飛踢；Z 空中拳（可接成空中連段）；↓+Z 下砸拳
   if (ctx.airborne) {
     if (kick) return { kind: 'flyingKick' }
-    return { kind: ctx.down ? 'diveSmash' : 'airPunch' }
+    if (punch) return { kind: ctx.down ? 'diveSmash' : 'airPunch' }
+    return null
   }
 
-  const other: Button = punch ? 'kick' : 'punch'
-  const otherRecently = ctx.presses.some(
-    (p) => p.button === other && p.frame <= ctx.frame && ctx.frame - p.frame <= SIMULTANEOUS_WINDOW,
-  )
-  // 保命招要真的同時壓住兩個鍵：先點 Z 再點 X（Z 已放開）只算一般的踢
-  const otherHeld = ctx.held ? ctx.held.has(other) : true
-  if (otherRecently && otherHeld) return { kind: 'desperation' }
+  // 保命招：Z、X、C 三鍵在 SIMULTANEOUS_WINDOW 幀內按下，而且最後一個按下時其他兩個都還壓著
+  const recently = (b: Button) =>
+    ctx.presses.some((p) => p.button === b && p.frame <= ctx.frame && ctx.frame - p.frame <= SIMULTANEOUS_WINDOW)
+  const stillHeld = (b: Button) => !ctx.held || ctx.held.has(b) || pressedNow(b)
+  if (DESPERATION_BUTTONS.every((b) => recently(b) && stillHeld(b))) return { kind: 'desperation' }
 
+  if (!punch && !kick) return null
   if (kick) return { kind: 'kick' }
   if (ctx.up) return { kind: 'launcher' }
   if (ctx.crouching) return { kind: 'sweep' }

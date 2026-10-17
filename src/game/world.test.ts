@@ -59,22 +59,40 @@ describe('World simulation', () => {
     expect(thug.life.max - thug.life.hp).toBe(6 + 7 + 10)
   })
 
-  it('z + x costs the agent life and hits', () => {
+  it('z + x + c costs the agent life and hits', () => {
     const { world, grunt } = arena()
-    tick(world, ['punch', 'kick'])
+    tick(world, ['punch', 'kick', 'grab'])
     run(world, 40)
     expect(world.agent.life.hp).toBe(192)
     expect(grunt.life.max - grunt.life.hp).toBe(12)
   })
 
-  it('pressing x while still holding z cancels the punch into the desperation move', () => {
+  it('pressing x + c while still holding z cancels the punch into the desperation move', () => {
     const { world, grunt } = arena()
     tick(world, ['punch'])
     run(world, 2, ['punch'])
-    tick(world, ['kick'], ['punch'])
+    tick(world, ['kick', 'grab'], ['punch'])
     run(world, 40)
     expect(world.agent.life.hp).toBe(192)
     expect(grunt.life.max - grunt.life.hp).toBe(12)
+  })
+
+  it('z + x + c does not also pick up the item at your feet', () => {
+    const { world, grunt } = arena()
+    world.placeItem('bat', 302)
+    tick(world, ['grab'])
+    tick(world, ['punch', 'kick'], ['grab'])
+    run(world, 40)
+    expect(world.agent.life.hp).toBe(192)
+    expect(world.agent.held).toBeNull()
+    expect(grunt.life.max - grunt.life.hp).toBe(12)
+  })
+
+  it('z + x (without c) is a kick, not the desperation move', () => {
+    const { world } = arena()
+    tick(world, ['punch', 'kick'])
+    run(world, 40)
+    expect(world.agent.life.hp).toBe(world.agent.life.max)
   })
 
   it('tapping z then x quickly is a punch followed by a kick, not the desperation move', () => {
