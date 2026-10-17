@@ -329,26 +329,6 @@ export class Agent extends Fighter {
     return this.state === 'action' && !!this.act?.def.itemUse
   }
 
-  /** 正在出的招式（提示下一步按鍵用）。 */
-  get action(): ActionDef | null {
-    return this.state === 'action' ? (this.act?.def ?? null) : null
-  }
-
-  /** 這一招是否已經打中人。 */
-  get actionLanded(): boolean {
-    return this.state === 'action' && !!this.act && this.act.hitIds.size > 0
-  }
-
-  /** 空中連段寬限期中等待的輸入（提示用）。 */
-  get pendingAirChain(): string | null {
-    return this.airChain?.on ?? null
-  }
-
-  /** 在空中且還能出空中招式。 */
-  get canAirAttack(): boolean {
-    return this.state === 'free' && this.airborne && !this.airAttackUsed && !this.held
-  }
-
   /** 敵人是否該對特務出手（倒地、起身、無敵中都不算）。 */
   get vulnerable(): boolean {
     return this.invuln === 0 && this.state !== 'launched' && this.state !== 'down' && this.state !== 'getup'

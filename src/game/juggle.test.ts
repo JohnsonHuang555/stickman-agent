@@ -159,7 +159,7 @@ describe('juggle exceptions', () => {
   })
 })
 
-describe('combo counter and hints', () => {
+describe('combo counter', () => {
   it('the full air combo counts 4 hits', () => {
     const { world } = setup()
     fullCombo(world)
@@ -179,46 +179,6 @@ describe('combo counter and hints', () => {
     }
     expect(world.agent.life.hp).toBeLessThan(world.agent.life.max)
     expect(world.combo.count).toBe(0)
-  })
-
-  it('hints the next button through the air combo', () => {
-    const { world } = setup()
-    const hints: (string | null)[] = []
-    const record = () => {
-      const h = world.comboHint()
-      if (h && hints[hints.length - 1] !== h) hints.push(h)
-    }
-    tick(world, ['punch'], ['up'])
-    for (let i = 0; i < 7; i++) {
-      tick(world, [], ['up'])
-      record()
-    }
-    tick(world, ['jump'])
-    for (let i = 0; i < 8; i++) {
-      tick(world)
-      record()
-    }
-    tick(world, ['punch'])
-    for (let i = 0; i < 7; i++) {
-      tick(world)
-      record()
-    }
-    tick(world, ['punch'])
-    for (let i = 0; i < 7; i++) {
-      tick(world)
-      record()
-    }
-    expect(hints).toEqual(['jump', 'punch', 'kick'])
-  })
-
-  it('no hint when the launcher whiffs', () => {
-    const { world, grunt } = setup()
-    grunt.x = 500
-    tick(world, ['punch'], ['up'])
-    for (let i = 0; i < 15; i++) {
-      tick(world, [], ['up'])
-      expect(world.comboHint()).toBeNull()
-    }
   })
 })
 
@@ -264,7 +224,6 @@ describe('human-paced timing (regression for "the air combo is hard to land")', 
     run(world, 8)
     tick(world, ['punch'])
     run(world, 34) // 第一拳的收招已經結束（含頓幀約 30 幀）
-    expect(world.comboHint()).toBe('punch')
     tick(world, ['punch'])
     run(world, 10)
     expect(damage()).toBe(8 + 5 + 6)

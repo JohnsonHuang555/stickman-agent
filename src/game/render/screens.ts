@@ -26,10 +26,6 @@ export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nicknam
 
   text(ctx, 'STICKMAN', VIEW_W / 2, 34, 24, 'center')
   text(ctx, 'AGENT', VIEW_W / 2, 64, 24, 'center')
-  ctx.font = '12px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#f5c518'
-  ctx.fillText('火柴人特務：黑幫大樓', VIEW_W / 2, 104)
 
   TITLE_MENU.forEach((item, i) => {
     const y = 128 + i * 18
