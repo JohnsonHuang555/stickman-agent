@@ -92,6 +92,24 @@ export function lerpPose(a: Pose, b: Pose, t: number): Pose {
   }
 }
 
+function hipHeightOf(s: Skeleton, pose: Pose): number {
+  return Math.max(s.footF[1], s.footB[1], 0) + pose.lift
+}
+
+/** 前手的螢幕位置與前臂方向（螢幕向量），用來把持有物畫在手上。 */
+export function frontHand(
+  pose: Pose,
+  x: number,
+  footY: number,
+  facing: 1 | -1,
+  scale = 1,
+): { x: number; y: number; dx: number; dy: number } {
+  const s = solve(pose)
+  const oy = footY - hipHeightOf(s, pose) * scale
+  const [dx, dy] = dir(pose.armF[1])
+  return { x: x + s.handF[0] * facing * scale, y: oy + s.handF[1] * scale, dx: dx * facing, dy }
+}
+
 export interface Palette {
   body: string
   /** 遠側手腳的顏色，用來分辨前後。 */
@@ -112,9 +130,8 @@ export function drawStickman(
   scale = 1,
 ): void {
   const s = solve(pose)
-  const hipHeight = Math.max(s.footF[1], s.footB[1], 0) + pose.lift
   const ox = x
-  const oy = footY - hipHeight * scale
+  const oy = footY - hipHeightOf(s, pose) * scale
   const at = (v: Vec): Vec => [ox + v[0] * facing * scale, oy + v[1] * scale]
 
   ctx.lineCap = 'round'

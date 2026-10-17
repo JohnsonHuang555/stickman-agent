@@ -1,18 +1,19 @@
 import { GRAVITY, GROUND_Y } from './constants'
-import type { ActiveHit, Box, HitSpec, RelBox } from './combat/types'
+import type { ActiveHit, Box, HitSpec, Hitter, RelBox, Team } from './combat/types'
 import type { Facing } from './input/commands'
+import { drawItemHeld } from './items/itemArt'
+import { ITEM_TYPES, categoryOf, type Item } from './items/itemTypes'
 import type { LifePool } from './life/lifePool'
-import { drawStickman, type Palette, type Pose } from './stickman/pose'
+import { drawStickman, frontHand, type Palette, type Pose } from './stickman/pose'
+import { HOLD_ARMS } from './stickman/poses'
 import type { World } from './world'
-
-export type Team = 'agent' | 'gang'
 
 let nextId = 1
 
 const FLASH_PALETTE: Palette = { body: '#ffffff', back: '#dddddd' }
 
-/** 特務與所有敵人的共同基底：位置、物理、命條與繪圖。 */
-export abstract class Fighter {
+/** 特務與所有敵人的共同基底：位置、物理、命條、持有物與繪圖。 */
+export abstract class Fighter implements Hitter {
   readonly id = nextId++
   /** 跳躍高度（離地 px）。 */
   h = 0
@@ -23,6 +24,8 @@ export abstract class Fighter {
   alpha = 1
   /** 被打中後閃白的剩餘幀數。 */
   flash = 0
+  /** 同時只能持有一件。 */
+  held: Item | null = null
   readonly scale: number = 1
   abstract readonly team: Team
   abstract readonly palette: Palette
@@ -40,7 +43,38 @@ export abstract class Fighter {
   abstract pose(): Pose
   abstract hurtbox(): Box | null
   abstract activeHit(): ActiveHit | null
-  abstract receiveHit(spec: HitSpec, dir: Facing): void
+  abstract receiveHit(spec: HitSpec, dir: Facing, world: World): void
+  /** 當前動作是否為使用近戰武器（命中時扣耐久度）。 */
+  protected abstract usingMeleeItem(): boolean
+
+  onHitLanded(_target: Fighter, world: World): void {
+    const item = this.held
+    if (!item || categoryOf(item) !== 'melee' || !this.usingMeleeItem()) return
+    item.uses--
+    if (item.uses <= 0) {
+      const hand = this.handPosition()
+      world.burst(hand.x, hand.y, ITEM_TYPES[item.type].debris)
+      this.held = null
+    }
+  }
+
+  get carryingHeavy(): boolean {
+    return !!this.held && !!ITEM_TYPES[this.held.type].heavy
+  }
+
+  /** 持有物件時，在可自由行動的姿勢上覆蓋手臂。 */
+  protected withHoldArms(pose: Pose): Pose {
+    if (!this.held) return pose
+    const category = categoryOf(this.held)
+    if (category === 'throwable') return { ...pose, ...HOLD_ARMS.carry }
+    if (category === 'firearm') return { ...pose, ...HOLD_ARMS.gun }
+    return pose
+  }
+
+  /** 前手的世界座標（x 為地板座標、y 為螢幕座標）。 */
+  handPosition() {
+    return frontHand(this.pose(), this.x, GROUND_Y - this.h, this.facing, this.scale)
+  }
 
   /** 套用重力與速度；回傳本幀是否剛落地。 */
   protected applyPhysics(world: World): boolean {
@@ -71,6 +105,7 @@ export abstract class Fighter {
 
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
     const x = this.x - camX
+    const pose = this.pose()
     ctx.globalAlpha = this.alpha * 0.25
     ctx.fillStyle = '#000'
     ctx.beginPath()
@@ -78,7 +113,8 @@ export abstract class Fighter {
     ctx.fill()
     ctx.globalAlpha = this.alpha
     const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
-    drawStickman(ctx, this.pose(), x, GROUND_Y - this.h, this.facing, palette, this.scale)
+    drawStickman(ctx, pose, x, GROUND_Y - this.h, this.facing, palette, this.scale)
+    if (this.held) drawItemHeld(ctx, this.held.type, frontHand(pose, x, GROUND_Y - this.h, this.facing, this.scale))
     ctx.globalAlpha = 1
   }
 }

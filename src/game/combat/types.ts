@@ -1,5 +1,9 @@
 import type { Clip } from '../stickman/clip'
 import type { Fighter } from '../fighter'
+import type { Facing } from '../input/commands'
+import type { World } from '../world'
+
+export type Team = 'agent' | 'gang'
 
 /** 螢幕座標矩形（左上角）。 */
 export interface Box {
@@ -40,6 +44,16 @@ export interface ActiveHit {
   hitsAllies?: boolean
 }
 
+/** 任何能造成傷害的東西：角色、子彈、被丟出的物件。 */
+export interface Hitter {
+  readonly team: Team
+  x: number
+  vx: number
+  facing: Facing
+  activeHit(): ActiveHit | null
+  onHitLanded?(target: Fighter, world: World): void
+}
+
 export interface ActionDef {
   clip: Clip
   /** 總幀數；空中動作為 Infinity，落地即結束。 */
@@ -53,8 +67,10 @@ export interface ActionDef {
   invuln?: boolean
   /** 霸體：被打只扣血，不會被打斷。 */
   armor?: boolean
+  /** 使用近戰武器的動作；命中時消耗耐久度。 */
+  itemUse?: boolean
   onStart?: (f: Fighter) => void
-  tick?: (f: Fighter, frame: number) => void
+  tick?: (f: Fighter, frame: number, world: World) => void
 }
 
 export interface ActionInstance {

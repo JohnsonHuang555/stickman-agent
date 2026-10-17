@@ -2,6 +2,8 @@ import type { ActionDef, ActionInstance, ActiveHit, Box, HitSpec } from '../comb
 import { Fighter } from '../fighter'
 import type { Button, InputBuffer, InputSnapshot } from '../input/buttons'
 import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, type Facing } from '../input/commands'
+import { itemAction, throwActionFor } from '../items/itemActions'
+import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import type { Pose } from '../stickman/pose'
 import { CLIPS } from '../stickman/poses'
@@ -9,6 +11,8 @@ import type { World } from '../world'
 import { MOVES, type MoveId } from './moves'
 
 const WALK_SPEED = 1.5
+/** 搬著櫃子時的移動速度倍率。 */
+const HEAVY_CARRY_SPEED = 0.5
 const JUMP_VELOCITY = 6.2
 const AIR_DRIFT = 1.6
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
@@ -17,6 +21,7 @@ const JUMP_BUFFER = 6
 const LAND_FRAMES = 4
 const DOWN_FRAMES = 40
 const GETUP_FRAMES = 18
+const PICKUP_FRAMES = 10
 
 const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'diveSmash'])
 const MOVE_FOR: Record<CommandKind, MoveId> = {
@@ -29,7 +34,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   sweep: 'sweep',
 }
 
-type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup'
+type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup'
 
 export class Agent extends Fighter {
   readonly team = 'agent' as const
@@ -39,9 +44,10 @@ export class Agent extends Fighter {
   private stateFrame = 0
   private animFrame = 0
   private act: ActionInstance | null = null
-  private held: ReadonlySet<Button> = new Set()
+  private buttons: ReadonlySet<Button> = new Set()
   private buffered: { cmd: Command; until: number } | null = null
   private jumpUntil = -1
+  private grabUntil = -1
   private crouching = false
   private walking = false
   private airAttackUsed = false
@@ -53,15 +59,16 @@ export class Agent extends Fighter {
 
   /** 每個實際幀都呼叫（包含頓幀期間），只負責收集輸入。 */
   readInput(snapshot: InputSnapshot, buffer: InputBuffer, realFrame: number): void {
-    this.held = snapshot.held
+    this.buttons = snapshot.held
     const cmd = recognizeCommand({
       frame: realFrame,
       presses: buffer.presses,
       airborne: this.airborne,
-      crouching: this.held.has('down') && !this.airborne,
+      crouching: this.buttons.has('down') && !this.airborne,
     })
     if (cmd) this.buffered = { cmd, until: realFrame + COMMAND_BUFFER }
     if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
+    if (snapshot.pressed.includes('grab')) this.grabUntil = realFrame + COMMAND_BUFFER
   }
 
   update(world: World): void {
@@ -74,13 +81,16 @@ export class Agent extends Fighter {
 
     switch (this.state) {
       case 'free':
-        this.updateFree(cmd, now)
+        this.updateFree(cmd, now, world)
         break
       case 'action':
-        this.updateAction(cmd)
+        this.updateAction(cmd, world)
         break
       case 'land':
         if (this.stateFrame >= LAND_FRAMES) this.setState('free')
+        break
+      case 'pickup':
+        if (this.stateFrame >= PICKUP_FRAMES) this.setState('free')
         break
       case 'hurt':
         this.vx *= 0.82
@@ -103,12 +113,28 @@ export class Agent extends Fighter {
     if (this.applyPhysics(world)) this.onLand()
   }
 
-  private updateFree(cmd: Command | null, now: number): void {
+  private updateFree(cmd: Command | null, now: number, world: World): void {
     if (cmd && this.tryStart(cmd)) return
     if (this.airborne) return
 
+    if (this.grabUntil >= now) {
+      this.grabUntil = -1
+      // 拿著槍時，腳邊的彈藥包優先於丟出
+      const item = world.pickupCandidate(this)
+      if (this.held && !(item && categoryOf(item.item) === 'ammo')) {
+        this.startAction(throwActionFor('agent'))
+        return
+      }
+      if (item) {
+        world.takeItem(item, this)
+        this.vx = 0
+        this.setState('pickup')
+        return
+      }
+    }
+
     const dir = this.heldDir()
-    if (this.jumpUntil >= now) {
+    if (this.jumpUntil >= now && !this.carryingHeavy) {
       this.jumpUntil = -1
       if (dir) this.facing = dir
       this.vx = dir * AIR_DRIFT
@@ -118,16 +144,16 @@ export class Agent extends Fighter {
       return
     }
 
-    this.crouching = this.held.has('down')
+    this.crouching = this.buttons.has('down') && !(this.held && categoryOf(this.held) === 'throwable')
     this.walking = !this.crouching && dir !== 0
-    this.vx = this.walking ? dir * WALK_SPEED : 0
+    this.vx = this.walking ? dir * WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1) : 0
     if (dir) this.facing = dir
   }
 
-  private updateAction(cmd: Command | null): void {
+  private updateAction(cmd: Command | null, world: World): void {
     const act = this.act!
     act.frame++
-    act.def.tick?.(this, act.frame)
+    act.def.tick?.(this, act.frame, world)
 
     if (cmd?.kind === 'punch' && act.def.chain && act.frame >= act.def.chain.accept) {
       act.chainQueued = true
@@ -148,7 +174,18 @@ export class Agent extends Fighter {
     }
   }
 
+  /**
+   * 空手：依指令出招。
+   * 持有物件：z 系指令一律變成使用持有物，x 仍是踢，招式全部停用。
+   */
   private tryStart(cmd: Command): boolean {
+    if (this.held) {
+      if (this.airborne) return false
+      this.buffered = null
+      this.startAction(cmd.kind === 'kick' ? MOVES.kick : itemAction(this.held, 'agent'))
+      return true
+    }
+
     const aerial = AERIAL.has(cmd.kind)
     if (this.airborne) {
       if (!aerial || this.airAttackUsed) return false
@@ -190,9 +227,13 @@ export class Agent extends Fighter {
   }
 
   private heldDir(): -1 | 0 | 1 {
-    const left = this.held.has('left')
-    const right = this.held.has('right')
+    const left = this.buttons.has('left')
+    const right = this.buttons.has('right')
     return left === right ? 0 : left ? -1 : 1
+  }
+
+  protected usingMeleeItem(): boolean {
+    return this.state === 'action' && !!this.act?.def.itemUse
   }
 
   /** 敵人是否該對特務出手（倒地、起身、無敵中都不算）。 */
@@ -219,13 +260,14 @@ export class Agent extends Fighter {
     return { spec, box: this.relToWorld(spec.box), hitIds: act.hitIds }
   }
 
-  receiveHit(spec: HitSpec, dir: Facing): void {
+  receiveHit(spec: HitSpec, dir: Facing, world: World): void {
     this.life.damage(spec.damage)
     this.flash = 4
     this.act = null
     this.crouching = false
     this.facing = (-dir) as Facing
     if (spec.knockdown || this.life.isDead) {
+      world.dropHeld(this)
       this.setState('launched')
       this.vx = dir * 2.4
       this.vh = 3.4
@@ -241,7 +283,9 @@ export class Agent extends Fighter {
       case 'action':
         return this.act!.def.clip.sample(this.act!.frame)
       case 'land':
-        return CLIPS.land.sample(0)
+        return this.withHoldArms(CLIPS.land.sample(0))
+      case 'pickup':
+        return CLIPS.pickup.sample(0)
       case 'hurt':
         return CLIPS.hurt.sample(0)
       case 'launched':
@@ -251,10 +295,10 @@ export class Agent extends Fighter {
       case 'getup':
         return CLIPS.getup.sample(0)
       case 'free':
-        if (this.airborne) return (this.vh > 0 ? CLIPS.jumpUp : CLIPS.jumpFall).sample(0)
+        if (this.airborne) return this.withHoldArms((this.vh > 0 ? CLIPS.jumpUp : CLIPS.jumpFall).sample(0))
         if (this.crouching) return CLIPS.crouch.sample(0)
-        if (this.walking) return CLIPS.walk.sample(this.animFrame)
-        return CLIPS.idle.sample(this.animFrame)
+        if (this.walking) return this.withHoldArms(CLIPS.walk.sample(this.animFrame))
+        return this.withHoldArms(CLIPS.idle.sample(this.animFrame))
     }
   }
 }

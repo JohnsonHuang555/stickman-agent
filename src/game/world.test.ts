@@ -47,6 +47,18 @@ describe('World simulation', () => {
     expect(grunt.life.max - grunt.life.hp).toBe(6 + 7 + 10)
   })
 
+  it('the full combo connects on a normal-sized grunt (knockback does not push it out of range)', () => {
+    const { world } = arena()
+    const thug = new Grunt(314, 'thug', { passive: true })
+    world.grunts = [thug]
+    for (let i = 0; i < 6; i++) {
+      tick(world, ['punch'])
+      run(world, 7)
+    }
+    run(world, 30)
+    expect(thug.life.max - thug.life.hp).toBe(6 + 7 + 10)
+  })
+
   it('z + x costs the agent life and hits', () => {
     const { world, grunt } = arena()
     tick(world, ['punch', 'kick'])

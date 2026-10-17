@@ -8,14 +8,14 @@ export const MOVES = {
   punch1: {
     clip: attackClip(ATTACK_POSES.punch1, 4, 4, 7),
     length: 15,
-    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 6, hitstun: 16, knockback: 1.2 },
+    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 6, hitstun: 16, knockback: 0.4 },
     chain: { accept: 3, at: 9, next: 'punch2' },
     cancelToDesperation: true,
   },
   punch2: {
     clip: attackClip(ATTACK_POSES.punch2, 4, 4, 8),
     length: 16,
-    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 7, hitstun: 16, knockback: 1.2 },
+    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 7, hitstun: 16, knockback: 0.4 },
     chain: { accept: 3, at: 9, next: 'punch3' },
   },
   punch3: {
@@ -24,7 +24,7 @@ export const MOVES = {
     hit: {
       from: 6,
       to: 9,
-      box: { forward: 0, up: 22, w: 16, h: 20 },
+      box: { forward: 2, up: 22, w: 18, h: 20 },
       damage: 10,
       hitstun: 20,
       knockback: 3,

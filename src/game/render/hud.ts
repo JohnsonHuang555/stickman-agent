@@ -1,4 +1,5 @@
 import { VIEW_H, VIEW_W } from '../constants'
+import { ITEM_TYPES } from '../items/itemTypes'
 import type { LifePool } from '../life/lifePool'
 import type { World } from '../world'
 
@@ -33,6 +34,12 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, 8, 8)
   text(ctx, 'AGENT', 8, 20, 6)
   drawLifeBar(ctx, 44, 20, 110, 6, world.agent.life)
+  const held = world.agent.held
+  if (held) {
+    const category = ITEM_TYPES[held.type].category
+    const suffix = category === 'firearm' ? ` x${held.uses}` : category === 'melee' ? ` ${'|'.repeat(held.uses)}` : ''
+    text(ctx, ITEM_TYPES[held.type].label + suffix, 44, 30, 6)
+  }
 
   const focus = world.focus
   if (focus && focus.until > world.realFrame && !focus.target.removed) {
@@ -44,7 +51,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   ctx.fillStyle = 'rgba(255,255,255,0.75)'
-  ctx.fillText('←→ 移動  ↓ 蹲  Z 拳  X 踢  空白 跳  Z+X 保命招  →→Z 衝刺拳  P 暫停  ` 判定框', VIEW_W / 2, VIEW_H - 3)
+  ctx.fillText('←→ 移動  ↓ 蹲  Z 拳/用  X 踢  空白 跳  C 撿/丟  Z+X 保命招  →→Z 衝刺拳  P 暫停  ` 判定框', VIEW_W / 2, VIEW_H - 3)
 
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
