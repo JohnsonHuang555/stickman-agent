@@ -112,6 +112,67 @@ function hipHeightOf(s: Skeleton, pose: Pose): number {
   return Math.max(s.footF[1], s.footB[1], 0) + pose.lift
 }
 
+/**
+ * 姿勢上所有關節與頭的外緣，相對腳底的位置（x 朝前、y 朝上為正）。
+ * 用來找出姿勢的實際中心，讓旋轉（翻滾、被打飛）繞著身體自己的中心轉。
+ */
+export function posePoints(pose: Pose, scale = 1): [x: number, up: number][] {
+  const s = solve(pose)
+  const hipH = hipHeightOf(s, pose)
+  const joints = [s.hip, s.neck, s.elbowF, s.handF, s.elbowB, s.handB, s.kneeF, s.footF, s.kneeB, s.footB]
+  const r = BODY.headR
+  const head: Vec[] = [
+    [s.head[0], s.head[1] - r],
+    [s.head[0], s.head[1] + r],
+    [s.head[0] - r, s.head[1]],
+    [s.head[0] + r, s.head[1]],
+  ]
+  return [...joints, ...head].map(([x, y]) => [x * scale, (hipH - y) * scale])
+}
+
+/**
+ * 把姿勢看成一顆球：中心（x 朝前、up 為離腳底的高度）與能包住整個身體的半徑。
+ * 旋轉時繞這個中心轉；在地上翻滾時把中心抬到離地一個半徑，最低點剛好貼地。
+ */
+export function poseBall(pose: Pose, scale = 1): { x: number; up: number; radius: number } {
+  const points = posePoints(pose, scale)
+  const xs = points.map(([x]) => x)
+  const ups = points.map(([, up]) => up)
+  const x = (Math.min(...xs) + Math.max(...xs)) / 2
+  const up = (Math.min(...ups) + Math.max(...ups)) / 2
+  const radius = Math.max(...points.map(([px, pu]) => Math.hypot(px - x, pu - up)))
+  return { x, up, radius }
+}
+
+/**
+ * 旋轉（翻滾、被打飛）的軸心與抬高量，螢幕座標。
+ * 畫的時候：繞 (pivotX, pivotY)（姿勢自己的中心）旋轉 rotation，再整個往上移 lift。
+ * grounded 時依「轉完之後最低的那一點」決定 lift，讓身體任何角度都剛好貼著地面滾。
+ */
+export function spinPivot(
+  pose: Pose,
+  x: number,
+  footY: number,
+  facing: 1 | -1,
+  scale: number,
+  rotation: number,
+  grounded: boolean,
+): { pivotX: number; pivotY: number; lift: number } {
+  const ball = poseBall(pose, scale)
+  const pivotX = x + ball.x * facing
+  const pivotY = footY - ball.up
+  if (!grounded) return { pivotX, pivotY, lift: 0 }
+  const sin = Math.sin(rotation)
+  const cos = Math.cos(rotation)
+  let lowest = -Infinity
+  for (const [px, up] of posePoints(pose, scale)) {
+    const dx = x + px * facing - pivotX
+    const dy = footY - up - pivotY
+    lowest = Math.max(lowest, pivotY + dx * sin + dy * cos)
+  }
+  return { pivotX, pivotY, lift: lowest - footY }
+}
+
 export interface Anchor {
   x: number
   y: number

@@ -4,7 +4,7 @@ import type { Facing } from './input/commands'
 import { drawItemHeld } from './items/itemArt'
 import { ITEM_TYPES, categoryOf, type Item } from './items/itemTypes'
 import type { LifePool } from './life/lifePool'
-import { backHand, drawStickman, frontHand, type Palette, type Pose } from './stickman/pose'
+import { backHand, drawStickman, frontHand, spinPivot, type Palette, type Pose } from './stickman/pose'
 import { HOLD_ARMS } from './stickman/poses'
 import type { World } from './world'
 
@@ -146,11 +146,14 @@ export abstract class Fighter implements Hitter {
     const footY = GROUND_Y - this.h
     ctx.save()
     if (this.rotation) {
-      // 以身體中段為軸翻滾
-      const pivotY = footY - 22 * this.scale
-      ctx.translate(x, pivotY)
+      // 把姿勢當成一顆球，繞它自己的中心轉；在地上翻滾時中心抬到離地一個半徑，
+      // 最低點剛好貼著地面滾，不會被甩到半空或陷進地裡
+      const { pivotX, pivotY, lift } = spinPivot(pose, x, footY, this.facing, this.scale, this.rotation, this.h === 0)
+      // 依序（由內而外）：繞姿勢中心旋轉，再整個往上移 lift 讓最低點貼地
+      ctx.translate(0, -lift)
+      ctx.translate(pivotX, pivotY)
       ctx.rotate(this.rotation)
-      ctx.translate(-x, -pivotY)
+      ctx.translate(-pivotX, -pivotY)
     }
     if (this.heldBack) drawItemHeld(ctx, this.heldBack.type, backHand(pose, x, footY, this.facing, this.scale))
     drawStickman(ctx, pose, x, footY, this.facing, palette, this.scale)

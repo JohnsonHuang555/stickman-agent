@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { HitSpec } from './combat/types'
-import { VIEW_W } from './constants'
+import { GROUND_Y, VIEW_W } from './constants'
 import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
 import { FLOORS } from './level/floors'
+import { posePoints, spinPivot } from './stickman/pose'
+import { POSES } from './stickman/poses'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -166,5 +168,48 @@ describe('wall bounce', () => {
     run(world, 20)
     expect(999 - grunt.life.hp).toBe(1 + 6)
     expect(grunt.x).toBeLessThanOrEqual(right)
+  })
+})
+
+describe('roll looks grounded (regression for "the body leaves the ground while rolling")', () => {
+  /**
+   * 用與 Fighter.draw 完全相同的軸心與轉換，把縮身姿勢轉一整圈，
+   * 回傳每個角度下身體最低點離地的高度（正值＝懸空、負值＝陷進地面）與最高點的高度。
+   */
+  function spin(facing: 1 | -1) {
+    const x = 100
+    const footY = GROUND_Y
+    const screen = posePoints(POSES.tuck).map(([px, up]): [number, number] => [x + px * facing, footY - up])
+    const gaps: number[] = []
+    let tallest = 0
+    for (let step = 0; step < 72; step++) {
+      const a = (step / 72) * Math.PI * 2
+      const { pivotX, pivotY, lift } = spinPivot(POSES.tuck, x, footY, facing, 1, a, true)
+      const ys = screen.map(([sx, sy]) => {
+        // canvas：translate(0, -lift) → translate(pivot) → rotate(a) → translate(-pivot)
+        const dx = sx - pivotX
+        const dy = sy - pivotY
+        return pivotY + dx * Math.sin(a) + dy * Math.cos(a) - lift
+      })
+      gaps.push(footY - Math.max(...ys))
+      tallest = Math.max(tallest, footY - Math.min(...ys))
+    }
+    return { gaps, tallest }
+  }
+
+  it('never sinks into the floor while rolling', () => {
+    for (const facing of [1, -1] as const) {
+      expect(Math.min(...spin(facing).gaps)).toBeGreaterThan(-1)
+    }
+  })
+
+  it('stays in contact with the ground at every angle (no floating)', () => {
+    for (const facing of [1, -1] as const) {
+      expect(Math.max(...spin(facing).gaps)).toBeLessThan(0.5)
+    }
+  })
+
+  it('stays a low ball (well under standing height)', () => {
+    expect(spin(1).tallest).toBeLessThan(34)
   })
 })
