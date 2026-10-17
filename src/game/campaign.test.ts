@@ -80,6 +80,24 @@ describe('campaign', () => {
     expect(world.phase).toBe('play')
   })
 
+  it('clearing a floor heals 20%, after the life bonus is counted', () => {
+    const world = new World()
+    clearAllZones(world)
+    world.agent.life.damage(110)
+    climbStairs(world)
+    expect(world.clearBonus.life).toBe(90 * 20)
+    expect(world.agent.life.hp).toBe(110)
+    expect(world.agent.life.barsRemaining).toBe(2) // 從紅條補回黃條
+  })
+
+  it('the floor-clear heal never goes above full', () => {
+    const world = new World()
+    clearAllZones(world)
+    world.agent.life.damage(5)
+    climbStairs(world)
+    expect(world.agent.life.hp).toBe(world.agent.life.max)
+  })
+
   it('clearing every zone then taking the stairs scores a bonus and moves to 2F, keeping life and item', () => {
     const world = new World()
     clearAllZones(world)
@@ -94,7 +112,7 @@ describe('campaign', () => {
     run(world, 210)
     expect(world.floor?.label).toBe('2F')
     expect(world.phase).toBe('intro')
-    expect(world.agent.life.hp).toBe(150)
+    expect(world.agent.life.hp).toBe(150 + 20)
     expect(world.agent.held).toEqual({ type: 'katana', uses: 3 })
     expect(world.agent.x).toBe(40)
   })

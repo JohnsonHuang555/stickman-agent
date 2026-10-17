@@ -42,6 +42,8 @@ const CLEAR_FRAMES = 200
 const LIFE_BONUS_PER_HP = 20
 const TIME_BONUS_MAX = 5000
 const TIME_BONUS_PER_SECOND = 25
+/** 破完一層樓補一條命條的 20%（可補回上一條）。 */
+export const FLOOR_CLEAR_HEAL = 20
 
 const PISTOL_BULLET: HitSpec = {
   from: 0, to: Infinity, box: { forward: 0, up: 0, w: 6, h: 2 },
@@ -261,6 +263,8 @@ export class World {
         time: Math.max(0, TIME_BONUS_MAX - seconds * TIME_BONUS_PER_SECOND),
       }
       this.score += this.clearBonus.life + this.clearBonus.time
+      // 血量獎勵用補血前的血量算，再補血
+      this.agent.life.heal(FLOOR_CLEAR_HEAL)
       this.setPhase('clear')
       this.sound('clear')
     }

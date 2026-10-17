@@ -40,7 +40,11 @@ function drawClear(ctx: CanvasRenderingContext2D, world: World): void {
   text(ctx, `${world.floor!.label} CLEAR`, cx, 70, 16, 'center')
   if (t > 40) text(ctx, `LIFE BONUS  ${String(world.clearBonus.life).padStart(5, ' ')}`, cx, 115, 8, 'center')
   if (t > 70) text(ctx, `TIME BONUS  ${String(world.clearBonus.time).padStart(5, ' ')}`, cx, 135, 8, 'center')
-  if (t > 100) text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, cx, 165, 8, 'center')
+  if (t > 100) text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, cx, 160, 8, 'center')
+  if (t > 130) {
+    text(ctx, 'LIFE +20%', cx, 182, 8, 'center')
+    drawLifeBar(ctx, cx - 55, 196, 110, 6, world.agent.life)
+  }
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
