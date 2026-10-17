@@ -9,6 +9,7 @@ export type Button =
   | 'grab'
   | 'pause'
   | 'debug'
+  | 'confirm'
 
 export const KEYMAP: Readonly<Record<string, Button>> = {
   ArrowLeft: 'left',
@@ -22,6 +23,7 @@ export const KEYMAP: Readonly<Record<string, Button>> = {
   Escape: 'pause',
   KeyP: 'pause',
   Backquote: 'debug',
+  Enter: 'confirm',
 }
 
 /** 一幀的輸入快照。 */

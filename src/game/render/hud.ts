@@ -1,4 +1,5 @@
 import { VIEW_H, VIEW_W } from '../constants'
+import { floorLabel } from '../../leaderboard/leaderboard'
 import { ITEM_TYPES } from '../items/itemTypes'
 import type { LifePool } from '../life/lifePool'
 import type { World } from '../world'
@@ -20,7 +21,7 @@ export function drawLifeBar(ctx: CanvasRenderingContext2D, x: number, y: number,
   }
 }
 
-function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, size = 8, align: CanvasTextAlign = 'left') {
+export function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, size = 8, align: CanvasTextAlign = 'left') {
   ctx.font = `${size}px ${FONT}`
   ctx.textAlign = align
   ctx.textBaseline = 'top'
@@ -116,9 +117,12 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
-    text(ctx, 'GAME OVER', VIEW_W / 2, VIEW_H / 2 - 20, 16, 'center')
-    text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2 + 6, 8, 'center')
-    if (Math.floor(world.realFrame / 30) % 2 === 0) text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 26, 8, 'center')
+    text(ctx, 'GAME OVER', VIEW_W / 2, VIEW_H / 2 - 30, 16, 'center')
+    text(ctx, `REACHED ${floorLabel(world.result.floor)}`, VIEW_W / 2, VIEW_H / 2 - 4, 8, 'center')
+    text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2 + 12, 8, 'center')
+    if (world.phaseFrame > 60 && Math.floor(world.realFrame / 30) % 2 === 0) {
+      text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 34, 8, 'center')
+    }
   }
 
   if (world.paused) {

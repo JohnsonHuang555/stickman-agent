@@ -1,7 +1,12 @@
+import { App } from './app'
+import { play, unlockAudio } from './audio/sfx'
 import { Keyboard } from './engine/keyboard'
 import { startLoop } from './engine/loop'
 import { VIEW_H, VIEW_W } from './game/constants'
 import { World } from './game/world'
+import { LocalLeaderboard } from './leaderboard/leaderboard'
+import { loadNickname, saveNickname } from './leaderboard/profile'
+import { askNickname } from './ui/nicknameDialog'
 
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
@@ -14,11 +19,13 @@ function fit() {
 addEventListener('resize', fit)
 fit()
 
-if (import.meta.env.DEV && location.search.includes('bosses')) {
+const params = new URLSearchParams(location.search)
+
+if (import.meta.env.DEV && params.has('bosses')) {
   import('./dev/bossGallery').then(({ drawBossGallery }) => drawBossGallery(ctx))
-} else if (import.meta.env.DEV && location.search.includes('items')) {
+} else if (import.meta.env.DEV && params.has('items')) {
   import('./dev/itemGallery').then(({ drawItemGallery }) => drawItemGallery(ctx))
-} else if (import.meta.env.DEV && location.search.includes('poses')) {
+} else if (import.meta.env.DEV && params.has('poses')) {
   import('./dev/poseGallery').then(({ drawPoseGallery }) => {
     const draw = () => drawPoseGallery(ctx)
     draw()
@@ -26,20 +33,37 @@ if (import.meta.env.DEV && location.search.includes('bosses')) {
   })
 } else {
   const keyboard = new Keyboard()
-  keyboard.attach(window)
+  keyboard.attach(window, unlockAudio)
 
-  // ?training 進練習場；?floor=2 直接從 2F 開始（開發用）
-  const params = new URLSearchParams(location.search)
-  const options = {
-    mode: params.has('training') ? ('training' as const) : ('campaign' as const),
-    startFloor: import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0,
+  if (params.has('training')) {
+    // 練習場：跳過標題與排行榜
+    let world = new World({ mode: 'training' })
+    world.sound = play
+    startLoop(
+      () => {
+        world.update(keyboard.poll())
+        if (world.restartRequested) {
+          world = new World({ mode: 'training' })
+          world.sound = play
+        }
+      },
+      () => world.render(ctx),
+    )
+  } else {
+    // ?floor=2 直接從 2F 開始（開發用）
+    const startFloor = import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0
+    const app = new App({
+      worldOptions: { mode: 'campaign', startFloor },
+      leaderboard: new LocalLeaderboard(),
+      askNickname,
+      loadNickname,
+      saveNickname,
+      sound: play,
+      onDialogClosed: () => keyboard.clear(),
+    })
+    startLoop(
+      () => app.update(keyboard.poll()),
+      () => app.render(ctx),
+    )
   }
-  let world = new World(options)
-  startLoop(
-    () => {
-      world.update(keyboard.poll())
-      if (world.restartRequested) world = new World(options)
-    },
-    () => world.render(ctx),
-  )
 }

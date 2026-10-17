@@ -128,6 +128,7 @@ export class ItemEntity implements Hitter {
   private shatter(world: World): void {
     this.removed = true
     world.burst(this.x, GROUND_Y - this.h, ITEM_TYPES[this.item.type].debris)
+    world.sound('break')
   }
 
   draw(ctx: CanvasRenderingContext2D, camX: number): void {

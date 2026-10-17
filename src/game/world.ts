@@ -1,3 +1,5 @@
+import type { Sound } from '../audio/sfx'
+import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
 import { overlaps, type HitSpec, type Hitter } from './combat/types'
 import { GROUND_Y, VIEW_W } from './constants'
@@ -92,6 +94,8 @@ export class World {
   restartRequested = false
   /** HUD 右側顯示的敵人（最近被打的那個）。 */
   focus: { target: Enemy; until: number } | null = null
+  /** 音效輸出；測試時保持靜音。 */
+  sound: (s: Sound) => void = () => {}
   /** Boss 出場時的警告字幕。 */
   bossBanner: { boss: Boss; until: number } | null = null
   private missionClearIn: number | null = null
@@ -124,6 +128,12 @@ export class World {
       for (const [type, x] of layout) this.placeItem(type, x)
       this.crates = [new Crate(300), new Crate(700), new Crate(1150)]
     }
+  }
+
+  /** 這一局的成績：到達樓層（通關為 CLEARED_FLOOR）與分數。 */
+  get result(): { floor: number; score: number; cleared: boolean } {
+    const cleared = this.phase === 'complete'
+    return { floor: cleared ? CLEARED_FLOOR : this.floorIndex + 1, score: this.score, cleared }
   }
 
   get theme(): Theme {
@@ -212,6 +222,7 @@ export class World {
     this.confineToLock()
     if (this.agent.defeated && !this.gameOver) {
       this.gameOver = true
+      this.sound('gameOver')
       this.phaseFrame = 0
     }
 
@@ -232,7 +243,10 @@ export class World {
       if (boss?.life.isDead) for (const e of this.enemies) e.defeat()
       if (director.allCleared) {
         this.missionClearIn ??= MISSION_CLEAR_DELAY
-        if (--this.missionClearIn <= 0) this.setPhase('complete')
+        if (--this.missionClearIn <= 0) {
+          this.setPhase('complete')
+          this.sound('clear')
+        }
       }
       return
     }
@@ -245,6 +259,7 @@ export class World {
       }
       this.score += this.clearBonus.life + this.clearBonus.time
       this.setPhase('clear')
+      this.sound('clear')
     }
   }
 
@@ -256,6 +271,7 @@ export class World {
       const boss = new Boss(x, spawn.boss)
       this.enemies.push(boss)
       this.bossBanner = { boss, until: this.realFrame + BOSS_BANNER_FRAMES }
+      this.sound('warning')
       return
     }
     const held = spawn.held === undefined ? undefined : spawn.held === null ? null : newItem(spawn.held)
@@ -324,12 +340,14 @@ export class World {
       if (f.held) f.held.uses += e.item.uses
     } else {
       f.held = e.item
+      this.sound('pickup')
     }
   }
 
   throwHeld(f: Fighter): void {
     if (!f.held) return
     this.items.push(ItemEntity.thrown(f.held, f))
+    this.sound('throw')
     f.held = null
   }
 
@@ -346,9 +364,11 @@ export class World {
         this.bullets.push(new Bullet(x, h, f.facing * 6.5, vh, f.team, SHOTGUN_PELLET, 130, hitIds))
       }
       this.shake = Math.max(this.shake, 3)
+      this.sound('shotgun')
     } else {
       this.bullets.push(new Bullet(x, h, f.facing * 7, 0, f.team, PISTOL_BULLET, 320, new Set([f.id])))
       this.shake = Math.max(this.shake, 1.5)
+      this.sound('shot')
     }
   }
 
@@ -357,6 +377,7 @@ export class World {
     const hand = f.handPosition()
     this.bullets.push(new Bullet(hand.x + f.facing * 6, height, f.facing * 6, 0, f.team, PISTOL_BULLET, 360, new Set([f.id])))
     this.shake = Math.max(this.shake, 1.5)
+    this.sound('shot')
   }
 
   burst(x: number, y: number, color: string): void {
@@ -413,13 +434,17 @@ export class World {
         attacker.onHitLanded?.(this)
 
         this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : 4)
+        this.sound(target === this.agent ? 'hurt' : hit.spec.heavy ? 'heavyHit' : 'hit')
         if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
 
         if (target instanceof Enemy) {
           this.focus = { target, until: this.realFrame + 180 }
           if (attacker.team === 'agent' || hit.hitsAllies) {
             this.score += 10
-            if (wasAlive && target.life.isDead) this.score += target.score
+            if (wasAlive && target.life.isDead) {
+              this.score += target.score
+              this.sound('ko')
+            }
           }
         }
         // 子彈、碎掉或已命中的投擲物不再打中同一幀的其他人
@@ -433,6 +458,7 @@ export class World {
         if (crate.broken || hit.hitIds.has(crate.id) || !overlaps(hit.box, crate.box)) continue
         hit.hitIds.add(crate.id)
         crate.hit(this)
+        this.sound(crate.broken ? 'break' : 'hit')
         attacker.onHitLanded?.(this)
         this.hitstop = Math.max(this.hitstop, 3)
       }
@@ -453,9 +479,11 @@ export class World {
       if (e.item.type === 'medkit') {
         agent.life.heal(e.item.uses)
         this.popup(e.x, 'HEAL', '#7dff8a')
+        this.sound('heal')
       } else {
         this.score += e.item.uses
         this.popup(e.x, `+${e.item.uses}`, '#ffe36b')
+        this.sound('coin')
       }
     }
   }

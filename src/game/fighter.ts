@@ -56,6 +56,7 @@ export abstract class Fighter implements Hitter {
     if (item.uses <= 0) {
       const hand = this.handPosition()
       world.burst(hand.x, hand.y, ITEM_TYPES[item.type].debris)
+      world.sound('break')
       this.held = null
     }
   }
