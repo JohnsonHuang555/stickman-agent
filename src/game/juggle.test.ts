@@ -220,3 +220,52 @@ describe('combo counter and hints', () => {
     }
   })
 })
+
+describe('human-paced timing (regression for "the air combo is hard to land")', () => {
+  /** 每一步之間等待的幀數：d1 挑空→跳、d2 跳→Z、d3 Z→Z、d4 Z→X */
+  function attempt(type: 'thug' | 'heavy', d1: number, d2: number, d3: number, d4: number) {
+    const { world, damage } = setup(type)
+    tick(world, ['punch'], ['up'])
+    run(world, d1 - 1)
+    tick(world, ['jump'])
+    run(world, d2 - 1)
+    tick(world, ['punch'])
+    run(world, d3 - 1)
+    tick(world, ['punch'])
+    run(world, d4 - 1)
+    tick(world, ['kick'])
+    run(world, 40)
+    return damage()
+  }
+
+  it('connects even when every step is pressed late (reacting to the hints)', () => {
+    for (const type of ['thug', 'heavy'] as const) {
+      expect(attempt(type, 24, 22, 28, 30)).toBe(8 + 5 + 6 + 10)
+    }
+  })
+
+  it('every step has at least half a second (30 frames) of leeway', () => {
+    const nominal = [8, 9, 8, 8]
+    for (let step = 0; step < 4; step++) {
+      for (let d = 2; d <= 30; d++) {
+        const ds = [...nominal] as [number, number, number, number]
+        ds[step] = Math.max(d, step === 0 ? 5 : 1)
+        expect(attempt('thug', ...ds), `step ${step} delay ${ds[step]}`).toBe(29)
+      }
+    }
+  })
+
+  it('after an unchained air punch ends, there is still a short grace window to continue', () => {
+    const { world, damage } = setup()
+    tick(world, ['punch'], ['up'])
+    run(world, 7)
+    tick(world, ['jump'])
+    run(world, 8)
+    tick(world, ['punch'])
+    run(world, 34) // 第一拳的收招已經結束（含頓幀約 30 幀）
+    expect(world.comboHint()).toBe('punch')
+    tick(world, ['punch'])
+    run(world, 10)
+    expect(damage()).toBe(8 + 5 + 6)
+  })
+})

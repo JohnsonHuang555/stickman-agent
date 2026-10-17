@@ -18,12 +18,14 @@ const JUMP_VELOCITY = 6.8
 const AGENT_GRAVITY = 0.36
 const AIR_DRIFT = 2.2
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
-const COMMAND_BUFFER = 8
-const JUMP_BUFFER = 6
+const COMMAND_BUFFER = 10
+const JUMP_BUFFER = 8
 const LAND_FRAMES = 4
 const DOWN_FRAMES = 40
 const GETUP_FRAMES = 18
 const PICKUP_FRAMES = 10
+/** 空中連段收招結束後，還能接下一招的幀數。 */
+const AIR_CHAIN_GRACE = 14
 
 const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'diveSmash', 'airPunch'])
 const MOVE_FOR: Record<CommandKind, MoveId> = {
@@ -56,6 +58,8 @@ export class Agent extends Fighter {
   private crouching = false
   private walking = false
   private airAttackUsed = false
+  /** 空中連段收招後的寬限期：這段時間內按 on 仍可接 next。 */
+  private airChain: { next: MoveId; on: string; frames: number } | null = null
   private hitstun = 0
 
   constructor(x: number) {
@@ -85,6 +89,7 @@ export class Agent extends Fighter {
     this.animFrame++
     if (this.invuln > 0) this.invuln--
     if (this.flash > 0) this.flash--
+    if (this.airChain && --this.airChain.frames <= 0) this.airChain = null
     const cmd = this.buffered && this.buffered.until >= now ? this.buffered.cmd : null
 
     switch (this.state) {
@@ -183,6 +188,11 @@ export class Agent extends Fighter {
       return
     }
     if (act.frame >= act.def.length) {
+      // 空中連段的收招結束後，仍有一小段寬限期可以接下一招
+      const chain = act.def.chain
+      if (this.airborne && act.def.aerial && chain) {
+        this.airChain = { next: chain.next as MoveId, on: chain.on ?? 'punch', frames: AIR_CHAIN_GRACE }
+      }
       this.act = null
       this.setState('free')
     }
@@ -197,6 +207,14 @@ export class Agent extends Fighter {
       if (this.airborne) return false
       this.buffered = null
       this.startAction(cmd.kind === 'kick' ? MOVES.kick : itemAction(this.held, 'agent'))
+      return true
+    }
+
+    if (this.airborne && this.airChain && cmd.kind === this.airChain.on) {
+      const next = MOVES[this.airChain.next]
+      this.airChain = null
+      this.buffered = null
+      this.startAction(next)
       return true
     }
 
@@ -232,6 +250,7 @@ export class Agent extends Fighter {
   }
 
   private onLand(): void {
+    this.airChain = null
     this.airAttackUsed = false
     this.vx = 0
     if (this.state === 'launched') {
@@ -266,6 +285,11 @@ export class Agent extends Fighter {
   /** 這一招是否已經打中人。 */
   get actionLanded(): boolean {
     return this.state === 'action' && !!this.act && this.act.hitIds.size > 0
+  }
+
+  /** 空中連段寬限期中等待的輸入（提示用）。 */
+  get pendingAirChain(): string | null {
+    return this.airChain?.on ?? null
   }
 
   /** 在空中且還能出空中招式。 */

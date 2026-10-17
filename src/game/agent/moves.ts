@@ -16,8 +16,13 @@ const airHang = (f: Fighter) => {
   f.vx *= 0.85
 }
 
+/** 空中出拳時特務自己也往上帶一點，跟著被打上去的敵人一起升高。 */
+const airRise = (f: Fighter) => {
+  f.vh = Math.max(f.vh, 1.4)
+}
+
 /** 挑空技把雜兵打上空中的初速。 */
-export const LAUNCH_VELOCITY = 7.6
+export const LAUNCH_VELOCITY = 6.4
 
 // 判定距離（身體中心到前緣）：拳約 26px、踢約 34px；起手幀數比初版短約 20%
 export const MOVES = {
@@ -62,27 +67,30 @@ export const MOVES = {
   },
   /** ↑+Z：上勾拳把雜兵打上空中；收招時可按跳取消，跳起來追擊。 */
   launcher: {
-    clip: attackClip(ATTACK_POSES.punch3, 4, 6, 12),
-    length: 22,
+    clip: attackClip(ATTACK_POSES.punch3, 4, 6, 16),
+    length: 26,
     hit: { from: 4, to: 7, box: { forward: 2, up: 10, w: 26, h: 36 }, damage: 8, hitstun: 24, knockback: 0.6, launch: LAUNCH_VELOCITY },
-    jumpCancel: 7,
+    jumpCancel: 5,
     tick: punchStep,
   },
   /** 空中連段：Z → Z → X。 */
   airPunch1: {
-    clip: attackClip(ATTACK_POSES.airPunch1, 2, 3, 5, POSES.jumpFall),
-    length: 10,
+    clip: attackClip(ATTACK_POSES.airPunch1, 2, 3, 21, POSES.jumpFall),
+    // 收招拉長：接下一拳的空間比較寬；按得快的話照樣在第 6 幀就接上
+    length: 26,
     aerial: true,
-    hit: { from: 2, to: 4, box: { forward: 2, up: 16, w: 26, h: 22 }, damage: 5, hitstun: 18, knockback: 0.6 },
+    hit: { from: 2, to: 4, box: { forward: 2, up: -6, w: 28, h: 52 }, damage: 5, hitstun: 18, knockback: 0.6 },
     chain: { accept: 2, at: 6, next: 'airPunch2', on: 'airPunch' },
+    onStart: airRise,
     tick: airHang,
   },
   airPunch2: {
-    clip: attackClip(ATTACK_POSES.airPunch2, 2, 3, 6, POSES.jumpFall),
-    length: 11,
+    clip: attackClip(ATTACK_POSES.airPunch2, 2, 3, 23, POSES.jumpFall),
+    length: 28,
     aerial: true,
-    hit: { from: 2, to: 4, box: { forward: 2, up: 16, w: 26, h: 22 }, damage: 6, hitstun: 18, knockback: 0.6 },
+    hit: { from: 2, to: 4, box: { forward: 2, up: -6, w: 28, h: 52 }, damage: 6, hitstun: 18, knockback: 0.6 },
     chain: { accept: 2, at: 6, next: 'airSpike', on: 'flyingKick' },
+    onStart: airRise,
     tick: airHang,
   },
   airSpike: {
@@ -100,6 +108,7 @@ export const MOVES = {
       heavy: true,
       spike: true,
     },
+    onStart: airRise,
     tick: (f, frame) => {
       if (frame < 3) airHang(f)
     },

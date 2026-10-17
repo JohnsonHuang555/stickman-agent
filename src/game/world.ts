@@ -594,6 +594,8 @@ export class World {
     if (action === MOVES.launcher) return agent.actionLanded ? 'jump' : null
     if (action === MOVES.airPunch1) return agent.actionLanded ? 'punch' : null
     if (action === MOVES.airPunch2) return agent.actionLanded ? 'kick' : null
+    if (agent.pendingAirChain === 'airPunch') return 'punch'
+    if (agent.pendingAirChain === 'flyingKick') return 'kick'
     if (agent.canAirAttack) {
       const near = this.enemies.some(
         (e) => e instanceof Grunt && e.juggled && Math.abs(e.x - agent.x) < 50 && Math.abs(e.h - agent.h) < 50,

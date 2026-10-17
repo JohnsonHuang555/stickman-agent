@@ -81,12 +81,17 @@ export abstract class Fighter implements Hitter {
     return frontHand(this.pose(), this.x, GROUND_Y - this.h, this.facing, this.scale)
   }
 
+  /** 本幀的重力；子類別可依狀態改變（例如浮空時飄得比較久）。 */
+  protected currentGravity(): number {
+    return this.gravity
+  }
+
   /** 套用重力與速度；回傳本幀是否剛落地。 */
   protected applyPhysics(world: World): boolean {
     let landed = false
     if (this.airborne) {
       this.h += this.vh
-      this.vh -= this.gravity
+      this.vh -= this.currentGravity()
       if (this.h <= 0) {
         this.h = 0
         this.vh = 0

@@ -23,7 +23,9 @@ const MEDKIT_DROP_CHANCE = 0.1
 /** 同一次浮空最多被打幾下，之後一定落地。 */
 export const JUGGLE_LIMIT = 5
 /** 浮空中被打中時往上彈的速度（直接重設，敵人才會停在特務附近的高度）。 */
-const JUGGLE_POP = 2.4
+const JUGGLE_POP = 3
+/** 浮空時的重力（一般為 0.42），讓敵人在空中停留得久一點，人比較接得上。 */
+const JUGGLE_GRAVITY = 0.25
 const SPIKE_VELOCITY = -6
 const SPIKE_BOUNCE = 3.2
 
@@ -363,7 +365,7 @@ export class Grunt extends Enemy {
       this.setState('juggled')
       this.juggleHits = 1
       this.vh = spec.launch
-      this.vx = dir * 0.6
+      this.vx = 0 // 垂直往上飛，比較好追
       return true
     }
 
@@ -378,10 +380,16 @@ export class Grunt extends Enemy {
       this.vh = Math.max(this.vh, 2)
       this.vx = dir * 1.5
     } else {
-      this.vh = spec.launch ?? JUGGLE_POP
-      this.vx = dir * 0.3
+      // 比特務高就彈得少、比特務低就彈得多，讓敵人一直停在特務附近的高度
+      const above = this.h - world.agent.h
+      this.vh = spec.launch ?? Math.min(JUGGLE_POP + 1, Math.max(0.8, JUGGLE_POP - above * 0.08))
+      this.vx = dir * 0.2
     }
     return true
+  }
+
+  protected currentGravity(): number {
+    return this.state === 'juggled' ? JUGGLE_GRAVITY : this.gravity
   }
 
   /** 正在空中被追擊。 */
