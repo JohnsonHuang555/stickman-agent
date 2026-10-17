@@ -92,6 +92,11 @@ export class ItemEntity implements Hitter {
     if (this.h <= 0 && this.vh <= 0) {
       this.h = 0
       this.vh = 0
+      // 沒子彈的槍撿起來也沒用：一落地就消失
+      if (this.isEmptyGun) {
+        this.vanish(world)
+        return
+      }
       if (this.state === 'flying') {
         if (t.breaks) this.shatter(world)
         else {
@@ -123,6 +128,16 @@ export class ItemEntity implements Hitter {
     this.spent = true
     this.vx = -this.vx * 0.25
     this.vh = 2
+  }
+
+  private get isEmptyGun(): boolean {
+    return ITEM_TYPES[this.item.type].category === 'firearm' && this.item.uses <= 0
+  }
+
+  /** 安靜地消失：一小團灰色碎屑，不發出碎裂聲。 */
+  private vanish(world: World): void {
+    this.removed = true
+    world.burst(this.x, GROUND_Y - 3, '#9a9a9a')
   }
 
   private shatter(world: World): void {

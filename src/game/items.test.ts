@@ -338,3 +338,44 @@ describe('weapon hitboxes follow the weapon', () => {
     expect(damageOf(grunt)).toBe(0)
   })
 })
+
+describe('empty guns disappear (regression for "an empty gun on the floor is useless")', () => {
+  const pistolsOnFloor = (world: World) => world.items.filter((i) => i.item.type === 'pistol')
+
+  it('a thrown empty gun vanishes when it lands', () => {
+    const { world, agent } = setup([200])
+    agent.held = newItem('pistol', 0)
+    tick(world, ['punch'])
+    run(world, 80)
+    expect(agent.held).toBeNull()
+    expect(pistolsOnFloor(world)).toHaveLength(0)
+  })
+
+  it('an empty gun that hits someone still vanishes after it falls', () => {
+    const { world, agent, grunt } = setup([30])
+    agent.held = newItem('pistol', 0)
+    tick(world, ['punch'])
+    run(world, 80)
+    expect(damageOf(grunt)).toBe(10)
+    expect(pistolsOnFloor(world)).toHaveLength(0)
+  })
+
+  it('an empty gun dropped when knocked down vanishes too', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.agent.x = 300
+    world.agent.held = newItem('pistol', 0)
+    world.enemies = [new Grunt(318, 'heavy', { moves: ['slam'], held: null })]
+    for (let i = 0; i < 600 && world.agent.held; i++) tick(world)
+    run(world, 60)
+    expect(world.agent.held).toBeNull()
+    expect(pistolsOnFloor(world)).toHaveLength(0)
+  })
+
+  it('a gun that still has bullets stays on the floor after being thrown', () => {
+    const { world, agent } = setup([200])
+    agent.held = newItem('pistol', 3)
+    tick(world, ['grab'])
+    run(world, 80)
+    expect(pistolsOnFloor(world).map((i) => i.item.uses)).toEqual([3])
+  })
+})
