@@ -5,7 +5,7 @@ import type { ItemEntity } from '../items/itemEntity'
 import { categoryOf, newItem, type Item } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { STAND_HEIGHT, type Palette, type Pose } from '../stickman/pose'
-import { CLIPS } from '../stickman/poses'
+import { CLIPS, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { Enemy } from './enemy'
 import { ENEMY_MOVES, type EnemyMoveId } from './enemyMoves'
@@ -470,12 +470,12 @@ export class Grunt extends Enemy {
     switch (this.state) {
       case 'wait':
         return this.withHoldArms(
-          Math.abs(this.vx) > 0.05 ? CLIPS.walk.sample(this.animFrame) : CLIPS.idle.sample(this.animFrame),
+          Math.abs(this.vx) > 0.05 ? walkPose(this.stride) : CLIPS.idle.sample(this.animFrame),
         )
       case 'approach':
       case 'retreat':
       case 'fetch':
-        return this.withHoldArms(CLIPS.walk.sample(this.animFrame))
+        return this.withHoldArms(walkPose(this.stride))
       case 'pickup':
         return CLIPS.pickup.sample(0)
       case 'attack':

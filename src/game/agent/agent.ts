@@ -7,7 +7,7 @@ import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { CROUCH_HEIGHT, STAND_HEIGHT, type Pose } from '../stickman/pose'
-import { CLIPS } from '../stickman/poses'
+import { CLIPS, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { MOVES, type MoveId } from './moves'
 
@@ -36,13 +36,17 @@ const PICKUP_FRAMES = 10
 /** 空中連段收招結束後，還能接下一招的幀數。 */
 const AIR_CHAIN_GRACE = 14
 
-const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'diveSmash', 'airPunch'])
+const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'airKick', 'diveSmash', 'airPunch'])
+
+/** 連段的 on 可以是一種或多種輸入。 */
+const accepts = (on: string | readonly string[], kind: string) => (typeof on === 'string' ? on === kind : on.includes(kind))
 const MOVE_FOR: Record<CommandKind, MoveId> = {
   punch: 'punch1',
   kick: 'kick',
   desperation: 'desperation',
   launcher: 'launcher',
   airPunch: 'airPunch1',
+  airKick: 'airKick',
   flyingKick: 'flyingKick',
   diveSmash: 'diveSmash',
   dashPunch: 'dashPunch',
@@ -74,7 +78,7 @@ export class Agent extends Fighter {
   /** 上一次蹬的是哪一面牆（-1 左、1 右）；落地後重設。 */
   private lastWallSide: -1 | 0 | 1 = 0
   /** 空中連段收招後的寬限期：這段時間內按 on 仍可接 next。 */
-  private airChain: { next: MoveId; on: string; frames: number } | null = null
+  private airChain: { next: MoveId; on: string | readonly string[]; frames: number } | null = null
   private hitstun = 0
 
   constructor(x: number) {
@@ -232,7 +236,7 @@ export class Agent extends Fighter {
     }
 
     const chain = act.def.chain
-    if (chain && cmd?.kind === (chain.on ?? 'punch') && act.frame >= chain.accept) {
+    if (chain && cmd && accepts(chain.on ?? 'punch', cmd.kind) && act.frame >= chain.accept) {
       act.chainQueued = true
       this.buffered = null
     } else if (cmd?.kind === 'desperation' && act.def.cancelToDesperation && act.frame <= SIMULTANEOUS_WINDOW + 1) {
@@ -268,7 +272,7 @@ export class Agent extends Fighter {
       return true
     }
 
-    if (this.airborne && this.airChain && cmd.kind === this.airChain.on) {
+    if (this.airborne && this.airChain && accepts(this.airChain.on, cmd.kind)) {
       const next = MOVES[this.airChain.next]
       this.airChain = null
       this.buffered = null
@@ -435,7 +439,7 @@ export class Agent extends Fighter {
       case 'free':
         if (this.airborne) return this.withHoldArms((this.vh > 0 ? CLIPS.jumpUp : CLIPS.jumpFall).sample(0))
         if (this.crouching) return CLIPS.crouch.sample(0)
-        if (this.walking) return this.withHoldArms(CLIPS.walk.sample(this.animFrame))
+        if (this.walking) return this.withHoldArms(walkPose(this.stride))
         return this.withHoldArms(CLIPS.idle.sample(this.animFrame))
     }
   }

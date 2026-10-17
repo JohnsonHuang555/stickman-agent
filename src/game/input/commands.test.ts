@@ -61,8 +61,13 @@ describe('recognizeCommand', () => {
     expect(recognize(presses, 11 + SIMULTANEOUS_WINDOW)?.kind).toBe('kick')
   })
 
-  it('in the air, x is a flying kick, z is an air punch, and down+z is a dive smash', () => {
-    expect(recognize([press('kick', 10)], 10, { airborne: true })?.kind).toBe('flyingKick')
+  it('in the air, x is an air kick, ←/→ + x is a flying kick that way', () => {
+    expect(recognize([press('kick', 10)], 10, { airborne: true })?.kind).toBe('airKick')
+    expect(recognize([press('kick', 10)], 10, { airborne: true, held: ['right', 'kick'] })).toEqual({ kind: 'flyingKick', dir: 1 })
+    expect(recognize([press('kick', 10)], 10, { airborne: true, held: ['left', 'kick'] })).toEqual({ kind: 'flyingKick', dir: -1 })
+  })
+
+  it('in the air, z is an air punch and down+z is a dive smash', () => {
     expect(recognize([press('punch', 10)], 10, { airborne: true })?.kind).toBe('airPunch')
     expect(recognize([press('punch', 10)], 10, { airborne: true, down: true })?.kind).toBe('diveSmash')
   })
@@ -77,7 +82,8 @@ describe('recognizeCommand', () => {
   })
 
   it('no desperation move in the air', () => {
-    expect(recognize([press('punch', 10), press('kick', 10)], 10, { airborne: true })?.kind).toBe('flyingKick')
+    const presses = [press('punch', 10), press('kick', 10), press('grab', 10)]
+    expect(recognize(presses, 10, { airborne: true })?.kind).toBe('airKick')
   })
 
   it('crouching z is a sweep', () => {

@@ -64,8 +64,8 @@ export interface ActionDef {
   length: number
   hit?: HitSpec
   aerial?: boolean
-  /** 連擊：accept 幀起接受輸入 on（預設為出拳），at 幀起才接下一段 next。 */
-  chain?: { accept: number; at: number; next: string; on?: string }
+  /** 連擊：accept 幀起接受輸入 on（預設為出拳；可列多種），at 幀起才接下一段 next。 */
+  chain?: { accept: number; at: number; next: string; on?: string | readonly string[] }
   /** 從這一幀起按跳可以取消收招直接起跳（挑空技接追擊用）。 */
   jumpCancel?: number
   /**

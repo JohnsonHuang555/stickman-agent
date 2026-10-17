@@ -114,13 +114,33 @@ describe('World simulation', () => {
     expect(world.agent.h).toBe(0)
   })
 
-  it('a flying kick connects from the air', () => {
+  it('direction + x in the air is a flying kick that dashes forward and connects', () => {
     const { world, grunt } = arena(40)
     tick(world, ['jump'])
     run(world, 8)
-    tick(world, ['kick'])
+    tick(world, ['kick'], ['right'])
     run(world, 60)
     expect(grunt.life.max - grunt.life.hp).toBe(12)
+  })
+
+  it('x alone in the air is an air kick: no forward dash (regression)', () => {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump']) // 垂直起跳
+    run(world, 8)
+    const x0 = world.agent.x
+    tick(world, ['kick'])
+    run(world, 30)
+    expect(Math.abs(world.agent.x - x0)).toBeLessThan(3)
+  })
+
+  it('an air kick still hits someone in front', () => {
+    const { world, grunt } = arena(20)
+    tick(world, ['jump'])
+    run(world, 4)
+    tick(world, ['kick'])
+    run(world, 30)
+    expect(grunt.life.max - grunt.life.hp).toBe(9)
   })
 
   it('crouching z sweeps', () => {

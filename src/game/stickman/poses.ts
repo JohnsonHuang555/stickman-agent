@@ -1,5 +1,5 @@
 import { Clip, still } from './clip'
-import type { Limb, Pose } from './pose'
+import { BODY, type Limb, type Pose } from './pose'
 
 const P = (lean: number, armF: Limb, armB: Limb, legF: Limb, legB: Limb, lift = 0): Pose => ({
   lean,
@@ -28,11 +28,6 @@ const GUARD_B: Limb = [15, 155]
 export const POSES = {
   idleA: P(8, GUARD_F, GUARD_B, STANCE_F, STANCE_B),
   idleB: P(10, [38, 148], [18, 152], [26, 10], [-14, -28]),
-  // 跑步：手和腳反向擺動（前腳在前時前手在後），手肘彎約 90°
-  walk1: P(12, [-35, 55], [40, 130], [35, 15], [-30, -60]),
-  walk2: P(10, [0, 90], [5, 95], [5, -5], [35, -45]),
-  walk3: P(12, [40, 130], [-35, 55], [-30, -60], [35, 15]),
-  walk4: P(10, [5, 95], [0, 90], [35, -45], [5, -5]),
   crouch: P(20, [40, 150], [25, 155], [75, -15], [10, -80]),
   jumpUp: P(10, [130, 160], [-50, -10], [70, -10], [20, -50]),
   jumpFall: P(6, [80, 110], [-60, -30], [35, 15], [-10, -30]),
@@ -45,6 +40,57 @@ export const POSES = {
   /** 翻滾時縮成一團：膝蓋往前收、雙手往前抱住小腿（軀幹和大腿要分開，轉起來才不會像一根棍子）。 */
   tuck: P(30, [60, 110], [50, 100], [95, -60], [85, -70]),
 } as const
+
+/*
+ * 走路：不用關鍵影格，而是先決定腳踩在哪裡，再用反向運動學算出大腿與小腿的角度。
+ * - 踩地的腳相對身體等速往後移，速度剛好等於前進速度 → 在地上完全不滑
+ * - 抬起的腳畫一個小弧線往前跨
+ * - 手跟腳反向擺動（前腳在前時前手在後）
+ * 動畫依實際走過的距離播放，走得慢的敵人腳步也跟著變慢。
+ */
+/** 一個循環（兩步）前進的距離。 */
+export const WALK_CYCLE_DISTANCE = 44
+/** 腳離骨盆最遠的水平距離（一步 22px）。 */
+const STEP_HALF = WALK_CYCLE_DISTANCE / 4
+/** 支撐腳伸到腿長的這個比例：經過身體正下方時腿幾乎打直，骨盆因此自然上下起伏。 */
+const STANCE_REACH = 0.97
+const SWING_LIFT = 6
+const ARM_SWING = 25
+const ELBOW_BEND = 50
+
+/** 兩段式腿的反向運動學：骨盆到腳的位置 (x 朝前, y 朝下) → [大腿, 小腿] 角度，膝蓋往前彎。 */
+function legIK(fx: number, fy: number): Limb {
+  const l1 = BODY.thigh
+  const l2 = BODY.shin
+  const d = Math.min(Math.hypot(fx, fy), l1 + l2 - 0.01)
+  const base = Math.atan2(fx, fy)
+  const atHip = Math.acos((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))
+  const atFoot = Math.acos((l2 * l2 + d * d - l1 * l1) / (2 * l2 * d))
+  const deg = 180 / Math.PI
+  return [(base + atHip) * deg, (base - atFoot) * deg]
+}
+
+/** 一隻腳在一個循環 phase（0..1）的水平位置與抬高量：前半段踩地往後移，後半段抬起往前跨。 */
+function footAt(phase: number): { x: number; lift: number } {
+  if (phase < 0.5) return { x: STEP_HALF - 4 * STEP_HALF * phase, lift: 0 }
+  const t = (phase - 0.5) / 0.5
+  return { x: -STEP_HALF + 2 * STEP_HALF * t, lift: SWING_LIFT * Math.sin(Math.PI * t) }
+}
+
+/** 走過 stride px 時的走路姿勢。 */
+export function walkPose(stride: number): Pose {
+  const phase = (((stride / WALK_CYCLE_DISTANCE) % 1) + 1) % 1
+  const front = footAt(phase)
+  const back = footAt((phase + 0.5) % 1)
+  // 骨盆高度由支撐腳決定：支撐腳保持接近打直
+  const stance = front.lift === 0 ? front : back
+  const reach = (BODY.thigh + BODY.shin) * STANCE_REACH
+  const hip = Math.sqrt(Math.max(0, reach * reach - stance.x * stance.x))
+  const swing = Math.cos(phase * Math.PI * 2) * ARM_SWING
+  const armF: Limb = [-swing, -swing + ELBOW_BEND]
+  const armB: Limb = [swing, swing + ELBOW_BEND]
+  return P(8, armF, armB, legIK(front.x, hip - front.lift), legIK(back.x, hip - back.lift))
+}
 
 /** 持有物件時覆蓋手臂的姿勢。 */
 export const HOLD_ARMS = {
@@ -59,15 +105,6 @@ export const CLIPS = {
     [
       { pose: POSES.idleA, dur: 30 },
       { pose: POSES.idleB, dur: 30 },
-    ],
-    true,
-  ),
-  walk: new Clip(
-    [
-      { pose: POSES.walk1, dur: 8 },
-      { pose: POSES.walk2, dur: 8 },
-      { pose: POSES.walk3, dur: 8 },
-      { pose: POSES.walk4, dur: 8 },
     ],
     true,
   ),
@@ -117,6 +154,8 @@ export const ATTACK_POSES = {
   punch3: [P(25, [20, 80], GUARD_B, [40, 0], [-20, -50]), P(-8, [150, 170], [10, 150], [15, 5], [-20, -30], 2)],
   /** 前踢：先收膝，再踢出；兩手張開保持平衡、支撐腳微彎。 */
   kick: [P(-5, [40, 140], [-30, 30], [80, -10], [-5, -15]), P(-25, [50, 120], [-50, -10], [95, 95], [-12, -22])],
+  /** 空中橫踢：前腳水平踢出，後腳收起，兩手張開。 */
+  airKick: [P(0, [60, 140], [-30, 0], [70, -10], [-10, -60]), P(-15, [60, 120], [-40, 0], [95, 95], [30, -60])],
   flyingKick: [P(0, [60, 140], [-30, 0], [60, -20], [-10, -60]), P(-10, [-40, -10], [-60, -30], [75, 75], [20, -60])],
   diveSmash: [P(-5, [170, -160], [160, -170], [40, -10], [-10, -40]), P(35, [70, 80], [60, 75], [30, -10], [-20, -40])],
   dashPunch: [P(20, [30, 160], [-20, 40], [40, 0], [-30, -40]), P(28, [90, 90], [-50, -10], [50, 10], [-45, -60])],

@@ -53,6 +53,8 @@ if (import.meta.env.DEV && params.has('scene')) {
   const camX = Number(params.get('cam') ?? 300)
   const combo = Number(params.get('combo') ?? 0)
   import('./dev/sceneGallery').then(({ sceneGallery }) => showStatic(sceneGallery(floor, camX, combo)))
+} else if (import.meta.env.DEV && params.has('walk')) {
+  import('./dev/walkGallery').then(({ drawWalkGallery }) => showStatic(drawWalkGallery))
 } else if (import.meta.env.DEV && params.has('roll')) {
   import('./dev/rollGallery').then(({ drawRollGallery }) => showStatic(drawRollGallery))
 } else if (import.meta.env.DEV && params.has('bosses')) {

@@ -96,7 +96,8 @@ export const MOVES = {
     length: 28,
     aerial: true,
     hit: { from: 2, to: 4, box: { forward: 2, up: -6, w: 28, h: 52 }, damage: 6, hitstun: 18, knockback: 0.6 },
-    chain: { accept: 2, at: 6, next: 'airSpike', on: 'flyingKick' },
+    // 第三下 X：空中踢或飛踢都接成下砸踢
+    chain: { accept: 2, at: 6, next: 'airSpike', on: ['airKick', 'flyingKick'] },
     airAssist: { hover: true, rise: true, whiffEnd: 10 },
   },
   airSpike: {
@@ -117,6 +118,14 @@ export const MOVES = {
     },
     airAssist: { rise: true },
   },
+  /** 空中單按 X：原地橫踢，不往前衝（保留跳躍原本的慣性）。 */
+  airKick: {
+    clip: attackClip(ATTACK_POSES.airKick, 3, 6, 7, POSES.jumpFall),
+    length: 16,
+    aerial: true,
+    hit: { from: 3, to: 8, box: { forward: 2, up: 6, w: 30, h: 16 }, damage: 9, hitstun: 20, knockback: 2 },
+  },
+  /** 空中 ←/→ + X：往該方向飛踢衝出去。 */
   flyingKick: {
     clip: aerialClip(ATTACK_POSES.flyingKick, 2),
     length: Infinity,

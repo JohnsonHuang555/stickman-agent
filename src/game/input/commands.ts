@@ -8,6 +8,7 @@ export type CommandKind =
   | 'desperation'
   | 'launcher'
   | 'airPunch'
+  | 'airKick'
   | 'flyingKick'
   | 'diveSmash'
   | 'dashPunch'
@@ -15,7 +16,7 @@ export type CommandKind =
 
 export interface Command {
   kind: CommandKind
-  /** 衝刺拳的方向。 */
+  /** 衝刺拳、飛踢的方向。 */
   dir?: Facing
 }
 
@@ -46,9 +47,14 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   const grab = pressedNow('grab')
   if (!punch && !kick && !grab) return null
 
-  // 空中：X 飛踢；Z 空中拳（可接成空中連段）；↓+Z 下砸拳
+  // 空中：X 空中踢；←/→+X 往該方向飛踢；Z 空中拳（可接成空中連段）；↓+Z 下砸拳
   if (ctx.airborne) {
-    if (kick) return { kind: 'flyingKick' }
+    if (kick) {
+      const left = ctx.held?.has('left') ?? false
+      const right = ctx.held?.has('right') ?? false
+      if (left !== right) return { kind: 'flyingKick', dir: right ? 1 : -1 }
+      return { kind: 'airKick' }
+    }
     if (punch) return { kind: ctx.down ? 'diveSmash' : 'airPunch' }
     return null
   }

@@ -3,7 +3,7 @@ import type { Facing } from '../input/commands'
 import { newItem } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { BODY, STAND_HEIGHT, headAnchor, type Palette, type Pose } from '../stickman/pose'
-import { CLIPS } from '../stickman/poses'
+import { CLIPS, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { BOSSES, type BossDef, type BossId, type BossPhase } from './bosses'
 import { BOSS_MOVES, type BossMove, type BossMoveId } from './bossMoves'
@@ -285,7 +285,7 @@ export class Boss extends Enemy {
     switch (this.state) {
       case 'stalk':
         return this.withHoldArms(
-          Math.abs(this.vx) > 0.05 ? CLIPS.walk.sample(this.animFrame) : CLIPS.idle.sample(this.animFrame),
+          Math.abs(this.vx) > 0.05 ? walkPose(this.stride) : CLIPS.idle.sample(this.animFrame),
         )
       case 'attack':
         return this.act!.def.clip.sample(this.act!.frame)

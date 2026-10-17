@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Pose } from './pose'
-import { ATTACK_POSES, HOLD_ARMS, POSES } from './poses'
+import { posePoints, type Pose } from './pose'
+import { ATTACK_POSES, HOLD_ARMS, POSES, WALK_CYCLE_DISTANCE, walkPose } from './poses'
 
 /** 角度差正規化到 (-180, 180]。 */
 const diff = (a: number, b: number) => ((((a - b) % 360) + 540) % 360) - 180
@@ -33,9 +33,21 @@ describe('pose anatomy (regression for "limbs look uncoordinated")', () => {
   })
 })
 
-describe('walk cycle', () => {
+describe('walk (regression for "arm swing looks unnatural" and feet sliding)', () => {
+  const STEPS = 64
+  const samples = Array.from({ length: STEPS }, (_, i) => (i / STEPS) * WALK_CYCLE_DISTANCE)
+
+  it('knees and elbows bend the right way at every point of the cycle', () => {
+    for (const stride of samples) {
+      const p = walkPose(stride)
+      for (const [thigh, shin] of [p.legF, p.legB]) expect(diff(thigh, shin)).toBeGreaterThanOrEqual(-TOLERANCE)
+      for (const [upper, fore] of [p.armF, p.armB]) expect(diff(fore, upper)).toBeGreaterThanOrEqual(-TOLERANCE)
+    }
+  })
+
   it('arms swing opposite to the legs', () => {
-    for (const p of [POSES.walk1, POSES.walk3]) {
+    for (const stride of [0, WALK_CYCLE_DISTANCE / 2]) {
+      const p = walkPose(stride)
       const legs = Math.sign(p.legF[0] - p.legB[0])
       const arms = Math.sign(p.armF[0] - p.armB[0])
       expect(legs).not.toBe(0)
@@ -43,9 +55,39 @@ describe('walk cycle', () => {
     }
   })
 
-  it('the second half mirrors the first half', () => {
-    expect(POSES.walk3.legF).toEqual(POSES.walk1.legB)
-    expect(POSES.walk3.armF).toEqual(POSES.walk1.armB)
-    expect(POSES.walk4.legF).toEqual(POSES.walk2.legB)
+  it('one foot is always on the ground', () => {
+    for (const stride of samples) {
+      const pts = posePoints(walkPose(stride))
+      expect(Math.min(pts[7][1], pts[9][1])).toBeCloseTo(0, 1)
+    }
+  })
+
+  it('the planted foot does not slide: it stays put in the world while the body walks forward', () => {
+    let prev: { foot: number; x: number } | null = null
+    let maxSlip = 0
+    for (const stride of samples) {
+      const pts = posePoints(walkPose(stride))
+      const planted = pts[7][1] <= pts[9][1] ? 7 : 9
+      const worldX = stride + pts[planted][0]
+      if (prev && prev.foot === planted) maxSlip = Math.max(maxSlip, Math.abs(worldX - prev.x))
+      prev = { foot: planted, x: worldX }
+    }
+    expect(maxSlip).toBeLessThan(0.3)
+  })
+})
+
+describe('walk posture (regression for "crouch-walking")', () => {
+  it('the supporting leg is nearly straight as it passes under the body', () => {
+    const p = walkPose(WALK_CYCLE_DISTANCE / 4) // 前腳正踩在身體正下方
+    expect(diff(p.legF[0], p.legF[1])).toBeLessThan(30)
+  })
+
+  it('the hips bob a little through the step', () => {
+    const heights = [0, WALK_CYCLE_DISTANCE / 8, WALK_CYCLE_DISTANCE / 4].map((s) =>
+      Math.max(...posePoints(walkPose(s)).map(([, up]) => up)),
+    )
+    const bob = Math.max(...heights) - Math.min(...heights)
+    expect(bob).toBeGreaterThan(1)
+    expect(bob).toBeLessThan(6)
   })
 })

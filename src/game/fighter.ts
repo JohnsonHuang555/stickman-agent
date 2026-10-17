@@ -26,6 +26,8 @@ export abstract class Fighter implements Hitter {
   flash = 0
   /** 同時只能持有一件。 */
   held: Item | null = null
+  /** 在地上累積走過的距離（px），用來播放走路動畫。 */
+  stride = 0
   /** 只用於外觀：整個身體的旋轉角度（弧度），被打飛翻滾時使用。 */
   rotation = 0
   /** 背包：手以外的一格，可放一把槍或一個醫療箱（只有特務會用）。 */
@@ -102,7 +104,10 @@ export abstract class Fighter implements Hitter {
         landed = true
       }
     }
+    const before = this.x
     this.x = Math.min(world.floorWidth - 8, Math.max(8, this.x + this.vx))
+    // 在地上實際走過的距離：走路動畫依距離播放，腳步才不會在地上滑
+    if (!this.airborne) this.stride += Math.abs(this.x - before)
     return landed
   }
 
