@@ -1,0 +1,157 @@
+import type { ActionDef } from '../combat/types'
+import { Clip } from '../stickman/clip'
+import type { Pose } from '../stickman/pose'
+import { ATTACK_POSES, POSES } from '../stickman/poses'
+
+/** 預備 → 出手 → 收招 的三段式動畫。 */
+function attackClip(
+  [windup, strike]: readonly Pose[],
+  windupFrames: number,
+  strikeFrames: number,
+  recoverFrames: number,
+  recoverPose: Pose = POSES.idleA,
+): Clip {
+  return new Clip([
+    { pose: windup, dur: windupFrames, blend: 2 },
+    { pose: strike, dur: strikeFrames, blend: 2 },
+    { pose: recoverPose, dur: recoverFrames },
+  ])
+}
+
+/** 空中動作：預備後保持出手姿勢直到落地。 */
+function aerialClip([windup, strike]: readonly Pose[], windupFrames: number): Clip {
+  return new Clip([
+    { pose: windup, dur: windupFrames, blend: 2 },
+    { pose: strike, dur: 1, blend: 2 },
+  ])
+}
+
+const DESPERATION_COST = 8
+
+export const MOVES = {
+  punch1: {
+    clip: attackClip(ATTACK_POSES.punch1, 4, 4, 7),
+    length: 15,
+    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 6, hitstun: 16, knockback: 1.2 },
+    chain: { accept: 3, at: 9, next: 'punch2' },
+    cancelToDesperation: true,
+  },
+  punch2: {
+    clip: attackClip(ATTACK_POSES.punch2, 4, 4, 8),
+    length: 16,
+    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 7, hitstun: 16, knockback: 1.2 },
+    chain: { accept: 3, at: 9, next: 'punch3' },
+  },
+  punch3: {
+    clip: attackClip(ATTACK_POSES.punch3, 6, 6, 12),
+    length: 24,
+    hit: {
+      from: 6,
+      to: 9,
+      box: { forward: 0, up: 22, w: 16, h: 20 },
+      damage: 10,
+      hitstun: 20,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    },
+  },
+  kick: {
+    clip: attackClip(ATTACK_POSES.kick, 7, 5, 10),
+    length: 22,
+    hit: { from: 7, to: 10, box: { forward: 4, up: 11, w: 18, h: 10 }, damage: 10, hitstun: 20, knockback: 2.2 },
+    cancelToDesperation: true,
+  },
+  flyingKick: {
+    clip: aerialClip(ATTACK_POSES.flyingKick, 3),
+    length: Infinity,
+    aerial: true,
+    hit: {
+      from: 3,
+      to: Infinity,
+      box: { forward: 2, up: -2, w: 18, h: 12 },
+      damage: 12,
+      hitstun: 20,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    },
+    onStart: (f) => {
+      f.vx = f.facing * 2.6
+      f.vh = Math.max(f.vh, 1.2)
+    },
+  },
+  diveSmash: {
+    clip: aerialClip(ATTACK_POSES.diveSmash, 6),
+    length: Infinity,
+    aerial: true,
+    hit: {
+      from: 6,
+      to: Infinity,
+      box: { forward: -2, up: -6, w: 18, h: 22 },
+      damage: 10,
+      hitstun: 22,
+      knockback: 1.5,
+      knockdown: true,
+      heavy: true,
+    },
+    onStart: (f) => {
+      f.vx *= 0.4
+      f.vh = Math.max(f.vh, 1.5)
+    },
+    tick: (f, frame) => {
+      if (frame === 6) f.vh = -4.5
+    },
+  },
+  dashPunch: {
+    clip: attackClip(ATTACK_POSES.dashPunch, 3, 12, 11),
+    length: 26,
+    hit: {
+      from: 3,
+      to: 14,
+      box: { forward: 2, up: 23, w: 18, h: 10 },
+      damage: 12,
+      hitstun: 20,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    },
+    onStart: (f) => {
+      f.vx = f.facing * 4.4
+    },
+    tick: (f, frame) => {
+      f.vx = frame > 14 ? 0 : f.vx * 0.94
+    },
+  },
+  sweep: {
+    clip: attackClip(ATTACK_POSES.sweep, 5, 6, 13, POSES.crouch),
+    length: 24,
+    hit: { from: 5, to: 9, box: { forward: 0, up: 0, w: 24, h: 7 }, damage: 8, hitstun: 20, knockback: 1.5, knockdown: true },
+  },
+  desperation: {
+    clip: new Clip([
+      ...Array.from({ length: 4 }, () => [
+        { pose: ATTACK_POSES.spinA[0], dur: 4, blend: 1 },
+        { pose: ATTACK_POSES.spinB[0], dur: 4, blend: 1 },
+      ]).flat(),
+      { pose: POSES.land, dur: 6 },
+    ]),
+    length: 38,
+    invuln: true,
+    hit: {
+      from: 6,
+      to: 28,
+      box: { forward: -24, up: 4, w: 48, h: 28 },
+      damage: 12,
+      hitstun: 24,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    },
+    onStart: (f) => {
+      f.life.damage(Math.min(DESPERATION_COST, f.life.hp - 1))
+    },
+  },
+} satisfies Record<string, ActionDef>
+
+export type MoveId = keyof typeof MOVES
