@@ -35,8 +35,13 @@ export const MOVES = {
   kick: {
     clip: attackClip(ATTACK_POSES.kick, 7, 5, 10),
     length: 22,
-    hit: { from: 7, to: 10, box: { forward: 4, up: 11, w: 18, h: 10 }, damage: 10, hitstun: 20, knockback: 2.2 },
+    // 判定到身體前方約 30px，比拳頭（約 18px）長得多
+    hit: { from: 7, to: 10, box: { forward: 2, up: 10, w: 28, h: 12 }, damage: 10, hitstun: 20, knockback: 2.2 },
     cancelToDesperation: true,
+    // 出腿時往前小跨一步
+    tick: (f, frame) => {
+      f.vx = frame >= 5 && frame <= 10 ? f.facing * 1.2 : 0
+    },
   },
   flyingKick: {
     clip: aerialClip(ATTACK_POSES.flyingKick, 3),
@@ -45,7 +50,7 @@ export const MOVES = {
     hit: {
       from: 3,
       to: Infinity,
-      box: { forward: 2, up: -2, w: 18, h: 12 },
+      box: { forward: 2, up: -2, w: 24, h: 14 },
       damage: 12,
       hitstun: 20,
       knockback: 3,

@@ -5,7 +5,7 @@ import type { Theme } from '../level/floors'
 function repeat(camX: number, step: number, parallax: number, draw: (x: number, wx: number) => void): void {
   const offset = camX * parallax
   for (let wx = Math.floor(offset / step) * step - step; wx < offset + VIEW_W + step; wx += step) {
-    draw(Math.round(wx - offset), wx)
+    draw(wx - offset, wx)
   }
 }
 
@@ -129,7 +129,7 @@ function office(ctx: CanvasRenderingContext2D, camX: number): void {
 
 /** 樓層終點往上的樓梯與 UP 標示。 */
 function stairs(ctx: CanvasRenderingContext2D, camX: number, stairsX: number): void {
-  const x = Math.round(stairsX - camX) - 30
+  const x = stairsX - camX - 30
   if (x > VIEW_W || x < -100) return
   ctx.fillStyle = '#1a1a1a'
   ctx.fillRect(x, 40, 70, GROUND_Y - 40)

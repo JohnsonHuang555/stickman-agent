@@ -205,3 +205,17 @@ describe('Grunt AI', () => {
     expect(world.agent.life.hp).toBeLessThan(world.agent.life.max)
   })
 })
+
+describe('reach', () => {
+  it('a kick reaches a grunt that a punch cannot', () => {
+    const punched = arena(30)
+    tick(punched.world, ['punch'])
+    run(punched.world, 20)
+    expect(punched.grunt.life.hp).toBe(punched.grunt.life.max)
+
+    const kicked = arena(30)
+    tick(kicked.world, ['kick'])
+    run(kicked.world, 30)
+    expect(kicked.grunt.life.max - kicked.grunt.life.hp).toBe(10)
+  })
+})

@@ -29,6 +29,7 @@ const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
 const BOSS_BANNER_FRAMES = 150
 const POPUP_FRAMES = 50
+const MUZZLE_FRAMES = 5
 /** 自動撿起醫療箱、分數道具的距離。 */
 const CONSUME_REACH = 12
 
@@ -81,6 +82,8 @@ export class World {
   items: ItemEntity[] = []
   bullets: Bullet[] = []
   crates: Crate[] = []
+  /** 槍口火光（螢幕 y）。 */
+  flashes: { x: number; y: number; size: number; born: number }[] = []
   /** 撿到道具時浮起的文字。 */
   popups: { x: number; text: string; color: string; born: number }[] = []
 
@@ -358,6 +361,7 @@ export class World {
     const hand = f.handPosition()
     const h = GROUND_Y - hand.y
     const x = hand.x + f.facing * 6
+    this.muzzleFlash(x, hand.y, gun.type === 'shotgun' ? 9 : 6)
     if (gun.type === 'shotgun') {
       const hitIds = new Set([f.id])
       for (const vh of [-0.45, 0, 0.45]) {
@@ -376,8 +380,13 @@ export class World {
   shoot(f: Fighter, height: number): void {
     const hand = f.handPosition()
     this.bullets.push(new Bullet(hand.x + f.facing * 6, height, f.facing * 6, 0, f.team, PISTOL_BULLET, 360, new Set([f.id])))
+    this.muzzleFlash(hand.x + f.facing * 6, GROUND_Y - height, 6)
     this.shake = Math.max(this.shake, 1.5)
     this.sound('shot')
+  }
+
+  private muzzleFlash(x: number, y: number, size: number): void {
+    this.flashes.push({ x, y, size, born: this.realFrame })
   }
 
   burst(x: number, y: number, color: string): void {
@@ -521,7 +530,7 @@ export class World {
     if (this.shake > 0.5) {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
-    const camX = Math.round(this.camX)
+    const camX = this.camX
     drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null)
     for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
@@ -530,6 +539,18 @@ export class World {
     this.agent.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'flying') i.draw(ctx, camX)
     for (const b of this.bullets) b.draw(ctx, camX)
+    this.flashes = this.flashes.filter((f) => this.realFrame - f.born < MUZZLE_FRAMES)
+    for (const f of this.flashes) {
+      const t = 1 - (this.realFrame - f.born) / MUZZLE_FRAMES
+      ctx.fillStyle = `rgba(255, 190, 60, ${0.6 * t})`
+      ctx.beginPath()
+      ctx.arc(f.x - camX, f.y, f.size, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = `rgba(255, 255, 230, ${t})`
+      ctx.beginPath()
+      ctx.arc(f.x - camX, f.y, f.size * 0.45, 0, Math.PI * 2)
+      ctx.fill()
+    }
     this.particles.draw(ctx, camX)
     ctx.font = '8px "Press Start 2P", monospace'
     ctx.textAlign = 'center'
@@ -538,9 +559,9 @@ export class World {
       const age = this.realFrame - p.born
       const y = GROUND_Y - 30 - age * 0.5
       ctx.fillStyle = '#000'
-      ctx.fillText(p.text, Math.round(p.x - camX) + 1, Math.round(y) + 1)
+      ctx.fillText(p.text, p.x - camX + 1, y + 1)
       ctx.fillStyle = p.color
-      ctx.fillText(p.text, Math.round(p.x - camX), Math.round(y))
+      ctx.fillText(p.text, p.x - camX, y)
     }
     if (this.debug) this.drawBoxes(ctx, camX)
     ctx.restore()
@@ -551,7 +572,7 @@ export class World {
     if (this.agent.airborne) return
     const e = this.pickupCandidate(this.agent)
     if (!e || (this.agent.held && categoryOf(e.item) !== 'ammo')) return
-    const x = Math.round(e.x - camX)
+    const x = e.x - camX
     const y = GROUND_Y - 34 + (Math.floor(this.realFrame / 15) % 2)
     ctx.fillStyle = '#000'
     ctx.fillRect(x - 5, y - 1, 11, 10)

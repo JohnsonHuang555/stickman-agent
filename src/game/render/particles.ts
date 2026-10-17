@@ -44,7 +44,7 @@ export class Particles {
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
     for (const p of this.list) {
       ctx.fillStyle = p.color
-      ctx.fillRect(Math.round(p.x - camX), Math.round(p.y), 2, 2)
+      ctx.fillRect(p.x - camX - 1, p.y - 1, 2, 2)
     }
   }
 }

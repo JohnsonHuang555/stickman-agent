@@ -11,26 +11,49 @@ import { askNickname } from './ui/nicknameDialog'
 const canvas = document.getElementById('game') as HTMLCanvasElement
 const ctx = canvas.getContext('2d')!
 
+/**
+ * 遊戲邏輯一律使用 480×270 的座標；畫布本身依視窗大小與螢幕解析度（devicePixelRatio）
+ * 建立高解析度的像素，每幀用 setTransform 把邏輯座標放大，線條與文字才會清晰。
+ */
 function fit() {
-  const scale = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)))
-  canvas.style.width = `${VIEW_W * scale}px`
-  canvas.style.height = `${VIEW_H * scale}px`
+  const cssScale = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)
+  const dpr = window.devicePixelRatio || 1
+  canvas.style.width = `${Math.floor(VIEW_W * cssScale)}px`
+  canvas.style.height = `${Math.floor(VIEW_H * cssScale)}px`
+  canvas.width = Math.round(VIEW_W * cssScale * dpr)
+  canvas.height = Math.round(VIEW_H * cssScale * dpr)
 }
-addEventListener('resize', fit)
+/** 只畫一次的頁面（開發用總覽）在畫布尺寸改變後要重畫，因為改尺寸會清空畫布。 */
+let redrawStatic: (() => void) | null = null
+addEventListener('resize', () => {
+  fit()
+  redrawStatic?.()
+})
 fit()
+
+/** 每次繪圖前呼叫：把邏輯座標對應到實際像素。 */
+function beginFrame() {
+  ctx.setTransform(canvas.width / VIEW_W, 0, 0, canvas.height / VIEW_H, 0, 0)
+}
 
 const params = new URLSearchParams(location.search)
 
+/** 畫一張靜態頁面，並在尺寸改變或字型載入後重畫。 */
+function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
+  redrawStatic = () => {
+    beginFrame()
+    draw(ctx)
+  }
+  redrawStatic()
+  document.fonts.ready.then(redrawStatic)
+}
+
 if (import.meta.env.DEV && params.has('bosses')) {
-  import('./dev/bossGallery').then(({ drawBossGallery }) => drawBossGallery(ctx))
+  import('./dev/bossGallery').then(({ drawBossGallery }) => showStatic(drawBossGallery))
 } else if (import.meta.env.DEV && params.has('items')) {
-  import('./dev/itemGallery').then(({ drawItemGallery }) => drawItemGallery(ctx))
+  import('./dev/itemGallery').then(({ drawItemGallery }) => showStatic(drawItemGallery))
 } else if (import.meta.env.DEV && params.has('poses')) {
-  import('./dev/poseGallery').then(({ drawPoseGallery }) => {
-    const draw = () => drawPoseGallery(ctx)
-    draw()
-    document.fonts.ready.then(draw)
-  })
+  import('./dev/poseGallery').then(({ drawPoseGallery }) => showStatic(drawPoseGallery))
 } else {
   const keyboard = new Keyboard()
   keyboard.attach(window, unlockAudio)
@@ -47,7 +70,10 @@ if (import.meta.env.DEV && params.has('bosses')) {
           world.sound = play
         }
       },
-      () => world.render(ctx),
+      () => {
+        beginFrame()
+        world.render(ctx)
+      },
     )
   } else {
     // ?floor=2 直接從 2F 開始（開發用）
@@ -63,7 +89,10 @@ if (import.meta.env.DEV && params.has('bosses')) {
     })
     startLoop(
       () => app.update(keyboard.poll()),
-      () => app.render(ctx),
+      () => {
+        beginFrame()
+        app.render(ctx)
+      },
     )
   }
 }

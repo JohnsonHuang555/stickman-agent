@@ -48,7 +48,7 @@ export class Crate {
 
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
     if (this.wobble > 0) this.wobble--
-    const x = Math.round(this.x - camX - 10 + (this.wobble % 2 ? 1 : 0))
+    const x = this.x - camX - 10 + (this.wobble % 2 ? 1 : 0)
     const y = GROUND_Y - 18
     ctx.fillStyle = '#a8783f'
     ctx.fillRect(x, y, 20, 18)

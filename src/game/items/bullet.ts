@@ -38,13 +38,28 @@ export class Bullet implements Hitter {
     this.removed = true
   }
 
+  /** 曳光彈：外層橘色光暈、內層亮黃線，彈頭一個白點。 */
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
+    const x = this.x - camX
     const y = GROUND_Y - this.h
-    ctx.strokeStyle = '#ffe36b'
-    ctx.lineWidth = 1.5
+    const tx = x - this.vx * 2.8
+    const ty = y + this.vh * 2.8
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = 'rgba(255, 170, 40, 0.45)'
+    ctx.lineWidth = 4
     ctx.beginPath()
-    ctx.moveTo(this.x - camX - this.vx * 1.5, y + this.vh * 1.5)
-    ctx.lineTo(this.x - camX, y)
+    ctx.moveTo(tx, ty)
+    ctx.lineTo(x, y)
     ctx.stroke()
+    ctx.strokeStyle = '#fff3a0'
+    ctx.lineWidth = 1.6
+    ctx.beginPath()
+    ctx.moveTo(tx, ty)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(x, y, 1.6, 0, Math.PI * 2)
+    ctx.fill()
   }
 }
