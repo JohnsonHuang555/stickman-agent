@@ -5,16 +5,18 @@ import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, 
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import type { Pose } from '../stickman/pose'
+import { CROUCH_HEIGHT, STAND_HEIGHT, type Pose } from '../stickman/pose'
 import { CLIPS } from '../stickman/poses'
 import type { World } from '../world'
 import { MOVES, type MoveId } from './moves'
 
-const WALK_SPEED = 1.5
+const WALK_SPEED = 2.1
 /** 搬著櫃子時的移動速度倍率。 */
 const HEAVY_CARRY_SPEED = 0.5
-const JUMP_VELOCITY = 6.2
-const AIR_DRIFT = 1.6
+/** 搭配較小的重力：跳約 64px 高、滯空約 38 幀，方便空中連段。 */
+const JUMP_VELOCITY = 6.8
+const AGENT_GRAVITY = 0.36
+const AIR_DRIFT = 2.2
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
 const COMMAND_BUFFER = 8
 const JUMP_BUFFER = 6
@@ -39,6 +41,7 @@ type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'g
 export class Agent extends Fighter {
   readonly team = 'agent' as const
   readonly palette = { body: '#111111', back: '#4a4a4a' }
+  protected readonly gravity = AGENT_GRAVITY
 
   private state: AgentState = 'free'
   private stateFrame = 0
@@ -248,8 +251,8 @@ export class Agent extends Fighter {
 
   hurtbox(): Box | null {
     if (this.state === 'down' || this.state === 'getup') return null
-    if (this.crouching || this.act?.def === MOVES.sweep) return this.bodyBox(26)
-    return this.bodyBox(this.airborne ? 36 : 40)
+    if (this.crouching || this.act?.def === MOVES.sweep) return this.bodyBox(CROUCH_HEIGHT)
+    return this.bodyBox(this.airborne ? STAND_HEIGHT - 4 : STAND_HEIGHT)
   }
 
   activeHit(): ActiveHit | null {

@@ -29,6 +29,8 @@ export abstract class Fighter implements Hitter {
   /** 只用於外觀：後手拿的東西（雙刀劍客）。 */
   heldBack: Item | null = null
   readonly scale: number = 1
+  /** 每幀往下的加速度；特務較小，跳得高、滯空久。 */
+  protected readonly gravity: number = GRAVITY
   abstract readonly team: Team
   abstract readonly palette: Palette
 
@@ -84,7 +86,7 @@ export abstract class Fighter implements Hitter {
     let landed = false
     if (this.airborne) {
       this.h += this.vh
-      this.vh -= GRAVITY
+      this.vh -= this.gravity
       if (this.h <= 0) {
         this.h = 0
         this.vh = 0

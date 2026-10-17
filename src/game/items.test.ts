@@ -189,7 +189,7 @@ describe('throwing', () => {
     const { world, agent } = setup([400])
     agent.held = newItem('cabinet')
     run(world, 20, ['right'])
-    expect(agent.x).toBeLessThan(300 + 20 * 1.5 * 0.6)
+    expect(agent.x).toBeLessThan(300 + 20 * 2.1 * 0.6) // 空手走路速度為 2.1
     tick(world, ['jump'])
     run(world, 5)
     expect(agent.h).toBe(0)
@@ -283,13 +283,13 @@ describe('weapon hitboxes follow the weapon', () => {
   })
 
   it('the katana reaches farther than the bat', () => {
-    const batted = setup([52])
+    const batted = setup([58])
     batted.agent.held = newItem('bat')
     tick(batted.world, ['punch'])
     run(batted.world, 30)
     expect(damageOf(batted.grunt)).toBe(0)
 
-    const slashed = setup([52])
+    const slashed = setup([58])
     slashed.agent.held = newItem('katana')
     tick(slashed.world, ['punch'])
     run(slashed.world, 30)

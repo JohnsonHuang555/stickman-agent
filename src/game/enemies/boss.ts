@@ -2,7 +2,7 @@ import type { ActionInstance, ActiveHit, Box, HitSpec } from '../combat/types'
 import type { Facing } from '../input/commands'
 import { newItem } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import { headAnchor, type Palette, type Pose } from '../stickman/pose'
+import { BODY, STAND_HEIGHT, headAnchor, type Palette, type Pose } from '../stickman/pose'
 import { CLIPS } from '../stickman/poses'
 import type { World } from '../world'
 import { BOSSES, type BossDef, type BossId, type BossPhase } from './bosses'
@@ -221,7 +221,7 @@ export class Boss extends Enemy {
   }
 
   hurtbox(): Box | null {
-    return this.state === 'stalk' || this.state === 'attack' || this.state === 'hurt' ? this.bodyBox(40) : null
+    return this.state === 'stalk' || this.state === 'attack' || this.state === 'hurt' ? this.bodyBox(STAND_HEIGHT) : null
   }
 
   activeHit(): ActiveHit | null {
@@ -305,7 +305,9 @@ export class Boss extends Enemy {
 
   protected drawCostume(ctx: CanvasRenderingContext2D, pose: Pose, x: number, footY: number): void {
     const head = headAnchor(pose, x, footY, this.facing, this.scale)
-    const s = this.scale
+    // 裝扮以初版頭半徑 6 設計，依目前的頭大小等比縮放
+    const s = this.scale * (BODY.headR / 6)
+    const neck = (BODY.headR + BODY.neck) * this.scale
     ctx.save()
     ctx.translate(head.x, head.y)
     ctx.rotate(Math.atan2(head.dx, -head.dy))
@@ -336,8 +338,8 @@ export class Boss extends Enemy {
         ctx.strokeStyle = '#c0182c'
         ctx.lineWidth = 2 * s
         ctx.beginPath()
-        ctx.moveTo(0.8 * s, 7.5 * s)
-        ctx.lineTo(1.2 * s, 15 * s)
+        ctx.moveTo(0.8 * s, neck)
+        ctx.lineTo(1.2 * s, neck + 8 * this.scale)
         ctx.stroke()
         // 墨鏡
         ctx.fillStyle = '#111'

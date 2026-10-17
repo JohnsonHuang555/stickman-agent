@@ -15,16 +15,21 @@ export interface Pose {
   lift: number
 }
 
-/** 約 3.5 頭身。 */
+/** 約 5.5 頭身、身高約 48px：頭小、手腳長，翻滾與踢腿比較有張力。 */
 export const BODY = {
-  headR: 6,
+  headR: 4.5,
   neck: 1.5,
-  torso: 12.5,
-  upperArm: 7,
-  foreArm: 7,
-  thigh: 8,
-  shin: 8,
+  torso: 14.5,
+  upperArm: 9.5,
+  foreArm: 9.5,
+  thigh: 11.5,
+  shin: 11.5,
 } as const
+
+/** 站立時的身高（受擊框用）。 */
+export const STAND_HEIGHT = 46
+/** 蹲下時的高度；高處攻擊（敵人刺拳、高的子彈）要高於這個值才躲得掉。 */
+export const CROUCH_HEIGHT = 30
 
 type Vec = readonly [x: number, y: number]
 

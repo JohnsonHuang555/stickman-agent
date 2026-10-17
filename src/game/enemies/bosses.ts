@@ -46,8 +46,8 @@ export const BOSSES: Readonly<Record<BossId, BossDef>> = {
     score: 2000,
     costume: 'kane',
     phases: [
-      { moves: ['crowbarSwing', 'crowbarSwing', 'crowbarCharge', 'crowbarSlam'], walkSpeed: 0.9, cooldown: [50, 90], held: 'crowbar' },
-      { moves: ['crowbarSwing', 'crowbarCharge', 'crowbarCharge', 'crowbarSlam'], walkSpeed: 1.2, cooldown: [28, 55], held: 'crowbar' },
+      { moves: ['crowbarSwing', 'crowbarSwing', 'crowbarCharge', 'crowbarSlam'], walkSpeed: 1.2, cooldown: [50, 90], held: 'crowbar' },
+      { moves: ['crowbarSwing', 'crowbarCharge', 'crowbarCharge', 'crowbarSlam'], walkSpeed: 1.55, cooldown: [28, 55], held: 'crowbar' },
     ],
   },
   ryu: {
@@ -60,8 +60,8 @@ export const BOSSES: Readonly<Record<BossId, BossDef>> = {
     score: 2000,
     costume: 'ryu',
     phases: [
-      { moves: ['bladeSlash', 'bladeSlash', 'bladeDash', 'bladeSpin'], walkSpeed: 1.3, cooldown: [40, 70], held: 'katana', heldBack: 'katana' },
-      { moves: ['bladeSlash', 'bladeDash', 'bladeDash', 'bladeSpin'], walkSpeed: 1.6, cooldown: [22, 45], held: 'katana', heldBack: 'katana' },
+      { moves: ['bladeSlash', 'bladeSlash', 'bladeDash', 'bladeSpin'], walkSpeed: 1.7, cooldown: [40, 70], held: 'katana', heldBack: 'katana' },
+      { moves: ['bladeSlash', 'bladeDash', 'bladeDash', 'bladeSpin'], walkSpeed: 2.1, cooldown: [22, 45], held: 'katana', heldBack: 'katana' },
     ],
   },
   johnson: {
@@ -74,16 +74,16 @@ export const BOSSES: Readonly<Record<BossId, BossDef>> = {
     score: 10000,
     costume: 'johnson',
     phases: [
-      { moves: ['bossJab', 'bossJab', 'bossCharge'], walkSpeed: 1.0, cooldown: [45, 80] },
+      { moves: ['bossJab', 'bossJab', 'bossCharge'], walkSpeed: 1.3, cooldown: [45, 80] },
       {
         moves: ['bossSpray', 'bossSpray', 'bossJab'],
-        walkSpeed: 1.0,
+        walkSpeed: 1.3,
         cooldown: [40, 70],
         held: 'pistol',
         summon: [{ type: 'thug', side: 'left' }, { type: 'gunman', side: 'right', held: null }],
         summonEvery: 600,
       },
-      { moves: ['bossDesk', 'bossCharge', 'bossJab', 'bossDesk'], walkSpeed: 1.5, cooldown: [20, 45] },
+      { moves: ['bossDesk', 'bossCharge', 'bossJab', 'bossDesk'], walkSpeed: 1.95, cooldown: [20, 45] },
     ],
   },
 }

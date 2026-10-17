@@ -13,12 +13,13 @@ export function drawPoseGallery(ctx: CanvasRenderingContext2D): void {
   ]
   drawLobby(ctx, 0)
   const perRow = 12
-  const rowGap = 70
+  const rows = Math.ceil(entries.length / perRow)
+  const rowGap = 58
   entries.forEach(([name, pose], i) => {
     const col = i % perRow
     const row = Math.floor(i / perRow)
     const x = 22 + col * ((VIEW_W - 30) / perRow)
-    const footY = GROUND_Y - (2 - row) * rowGap
+    const footY = GROUND_Y - (rows - 1 - row) * rowGap
     drawStickman(ctx, pose, x, footY, 1, { body: '#111111', back: '#4a4a4a' })
     ctx.fillStyle = '#c00'
     ctx.fillRect(x - 10, footY, 20, 1)

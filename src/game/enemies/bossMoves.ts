@@ -37,9 +37,9 @@ const spinClip = new Clip([
 
 /** 魔王連射：先打三發高的（蹲下躲），再打兩發低的（跳起來躲）。 */
 const SPRAY_SHOTS: readonly [frame: number, height: number][] = [
-  [22, 28],
-  [28, 28],
-  [34, 28],
+  [22, 36],
+  [28, 36],
+  [34, 36],
   [46, 9],
   [54, 9],
 ]
@@ -91,7 +91,7 @@ export const BOSS_MOVES = {
     length: 42,
     range: 36,
     armor: true,
-    hit: hit(8, 30, { box: { forward: -32, up: 4, w: 64, h: 30 }, damage: 14, hitstun: 22, knockback: 3, knockdown: true, heavy: true }),
+    hit: hit(8, 30, { box: { forward: -34, up: 4, w: 68, h: 36 }, damage: 14, hitstun: 22, knockback: 3, knockdown: true, heavy: true }),
   },
 
   // ── 3F 魔王 Johnson ──
@@ -99,7 +99,7 @@ export const BOSS_MOVES = {
     clip: attackClip(ATTACK_POSES.punch1, 10, 4, 6, undefined, 6),
     length: 20,
     range: 24,
-    hit: hit(10, 12, { box: { forward: 2, up: 27, w: 18, h: 9 }, damage: 10, hitstun: 18, knockback: 0.6 }),
+    hit: hit(10, 12, { box: { forward: 2, up: 33, w: 20, h: 9 }, damage: 10, hitstun: 18, knockback: 0.6 }),
     followUp: 'bossHook',
   },
   bossHook: {

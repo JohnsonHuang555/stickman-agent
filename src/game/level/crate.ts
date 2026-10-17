@@ -33,7 +33,7 @@ export class Crate {
 
   /** 受擊範圍比外觀高，讓拳頭和子彈也打得到。 */
   get box(): Box {
-    return { x: this.x - 10, y: GROUND_Y - 34, w: 20, h: 34 }
+    return { x: this.x - 10, y: GROUND_Y - 40, w: 20, h: 40 }
   }
 
   hit(world: World): void {

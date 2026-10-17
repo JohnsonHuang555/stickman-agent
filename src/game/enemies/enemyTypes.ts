@@ -31,27 +31,27 @@ const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
 export const ENEMY_TYPES: Readonly<Record<EnemyType, EnemyTypeDef>> = {
   thug: {
     label: 'THUG', hue: 0, sat: 0, light: 55, hp: 40, score: 100, scale: 1,
-    walkSpeed: 1.0, cooldown: [50, 100], hoverDistance: 70, moves: ['jab', 'jab', 'kick'],
+    walkSpeed: 1.3, cooldown: [50, 100], hoverDistance: 70, moves: ['jab', 'jab', 'kick'],
     loadout: () => null, pickups: [],
   },
   bruiser: {
     label: 'BRUISER', hue: 215, sat: 60, light: 50, hp: 60, score: 150, scale: 1,
-    walkSpeed: 0.9, cooldown: [45, 90], hoverDistance: 65, moves: ['jab', 'kick', 'kick'],
+    walkSpeed: 1.2, cooldown: [45, 90], hoverDistance: 65, moves: ['jab', 'kick', 'kick'],
     loadout: () => (Math.random() < 0.7 ? newItem(pick(['bat', 'crowbar'] as const)) : null), pickups: ['melee'],
   },
   knifer: {
     label: 'KNIFER', hue: 135, sat: 50, light: 40, hp: 45, score: 200, scale: 1,
-    walkSpeed: 1.4, cooldown: [40, 80], hoverDistance: 90, moves: ['thrust', 'thrust', 'jab'],
+    walkSpeed: 1.8, cooldown: [40, 80], hoverDistance: 90, moves: ['thrust', 'thrust', 'jab'],
     loadout: () => newItem('knife'), pickups: ['melee'],
   },
   gunman: {
     label: 'GUNMAN', hue: 275, sat: 45, light: 50, hp: 45, score: 200, scale: 1,
-    walkSpeed: 1.0, cooldown: [70, 120], hoverDistance: 130, moves: ['kick'],
+    walkSpeed: 1.3, cooldown: [70, 120], hoverDistance: 130, moves: ['kick'],
     loadout: () => newItem('pistol', 3 + Math.floor(Math.random() * 4)), pickups: ['firearm'],
   },
   heavy: {
     label: 'HEAVY', hue: 28, sat: 85, light: 52, hp: 100, score: 300, scale: 1.2,
-    walkSpeed: 0.7, cooldown: [70, 120], hoverDistance: 60, moves: ['slam', 'jab'],
+    walkSpeed: 0.9, cooldown: [70, 120], hoverDistance: 60, moves: ['slam', 'jab'],
     loadout: () => null, pickups: ['throwable'],
   },
 }

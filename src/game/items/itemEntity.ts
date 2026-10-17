@@ -45,7 +45,7 @@ export class ItemEntity implements Hitter {
   }
 
   static thrown(item: Item, from: Fighter): ItemEntity {
-    const e = new ItemEntity(item, from.x + from.facing * 6, from.h + 30 * from.scale)
+    const e = new ItemEntity(item, from.x + from.facing * 6, from.h + 34 * from.scale)
     const t = e.throwSpec
     e.state = 'flying'
     e.team = from.team

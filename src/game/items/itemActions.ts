@@ -35,25 +35,25 @@ function swing(p: SwingParams, extra: number, itemUse = true): ActionDef {
 
 const SWINGS: Record<'bat' | 'crowbar' | 'knife' | 'katana', SwingParams> = {
   bat: {
-    poses: ATTACK_POSES.swing, windup: 8, strike: 4, recover: 12, reach: 36, length: 20,
+    poses: ATTACK_POSES.swing, windup: 8, strike: 4, recover: 12, reach: 42, length: 20,
     damage: 14, hitstun: 22, knockback: 2.5, knockdown: true, heavy: true,
   },
   crowbar: {
-    poses: ATTACK_POSES.swing, windup: 11, strike: 4, recover: 14, reach: 36, length: 20,
+    poses: ATTACK_POSES.swing, windup: 11, strike: 4, recover: 14, reach: 42, length: 20,
     damage: 16, hitstun: 26, knockback: 2.5, heavy: true,
   },
   knife: {
-    poses: ATTACK_POSES.punch1, windup: 4, strike: 3, recover: 8, reach: 28, length: 10, up: 22, h: 12,
+    poses: ATTACK_POSES.punch1, windup: 4, strike: 3, recover: 8, reach: 32, length: 10, up: 22, h: 12,
     damage: 8, hitstun: 16, knockback: 1.2,
   },
   katana: {
-    poses: ATTACK_POSES.swing, windup: 9, strike: 4, recover: 12, reach: 44, length: 28,
+    poses: ATTACK_POSES.swing, windup: 9, strike: 4, recover: 12, reach: 50, length: 28,
     damage: 22, hitstun: 26, knockback: 3, knockdown: true, heavy: true,
   },
 }
 
 const BUTT: SwingParams = {
-  poses: ATTACK_POSES.punch1, windup: 6, strike: 3, recover: 10, reach: 18, up: 22, h: 12,
+  poses: ATTACK_POSES.punch1, windup: 6, strike: 3, recover: 10, reach: 22, up: 26, h: 12,
   damage: 6, hitstun: 16, knockback: 1.5,
 }
 

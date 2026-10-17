@@ -4,7 +4,7 @@ import { itemAction, itemRange } from '../items/itemActions'
 import type { ItemEntity } from '../items/itemEntity'
 import { categoryOf, newItem, type Item } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import type { Palette, Pose } from '../stickman/pose'
+import { STAND_HEIGHT, type Palette, type Pose } from '../stickman/pose'
 import { CLIPS } from '../stickman/poses'
 import type { World } from '../world'
 import { Enemy } from './enemy'
@@ -285,7 +285,7 @@ export class Grunt extends Enemy {
   hurtbox(): Box | null {
     const s = this.state
     if (s === 'launched' || s === 'down' || s === 'getup' || s === 'dying') return null
-    return this.bodyBox(40)
+    return this.bodyBox(STAND_HEIGHT)
   }
 
   activeHit(): ActiveHit | null {

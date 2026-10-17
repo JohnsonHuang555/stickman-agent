@@ -11,21 +11,21 @@ export const ENEMY_MOVES = {
   jab: {
     clip: attackClip(ATTACK_POSES.punch1, 12, 5, 12, undefined, 8),
     length: 29,
-    range: 22,
-    // up 27 起算，蹲下（受擊框高 26）可以躲過
-    hit: { from: 12, to: 14, box: { forward: 2, up: 27, w: 16, h: 8 }, damage: 8, hitstun: 18, knockback: 1.5 },
+    range: 24,
+    // up 33 起算，蹲下（受擊框高 30）可以躲過
+    hit: { from: 12, to: 14, box: { forward: 2, up: 33, w: 20, h: 9 }, damage: 8, hitstun: 18, knockback: 1.5 },
   },
   kick: {
     clip: attackClip(ATTACK_POSES.kick, 14, 6, 12, undefined, 8),
     length: 32,
-    range: 26,
-    hit: { from: 14, to: 17, box: { forward: 4, up: 11, w: 18, h: 10 }, damage: 10, hitstun: 20, knockback: 2.2 },
+    range: 28,
+    hit: { from: 14, to: 17, box: { forward: 4, up: 12, w: 22, h: 12 }, damage: 10, hitstun: 20, knockback: 2.2 },
   },
   thrust: {
     clip: attackClip(ATTACK_POSES.dashPunch, 16, 10, 14, undefined, 10),
     length: 40,
     range: 60,
-    hit: { from: 16, to: 26, box: { forward: 2, up: 24, w: 16, h: 8 }, damage: 10, hitstun: 18, knockback: 2 },
+    hit: { from: 16, to: 26, box: { forward: 2, up: 28, w: 18, h: 9 }, damage: 10, hitstun: 18, knockback: 2 },
     tick: (f, frame) => {
       f.vx = frame >= 16 && frame <= 26 ? f.facing * 3.2 : 0
     },
@@ -38,7 +38,7 @@ export const ENEMY_MOVES = {
     hit: {
       from: 22,
       to: 25,
-      box: { forward: 0, up: 8, w: 24, h: 28 },
+      box: { forward: 0, up: 8, w: 26, h: 34 },
       damage: 18,
       hitstun: 24,
       knockback: 3,
