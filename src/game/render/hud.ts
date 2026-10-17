@@ -46,6 +46,14 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.fillStyle = 'rgba(255,255,255,0.75)'
   ctx.fillText('←→ 移動  ↓ 蹲  Z 拳  X 踢  空白 跳  Z+X 保命招  →→Z 衝刺拳  P 暫停  ` 判定框', VIEW_W / 2, VIEW_H - 3)
 
+  if (world.gameOver) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+    text(ctx, 'GAME OVER', VIEW_W / 2, VIEW_H / 2 - 20, 16, 'center')
+    text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2 + 6, 8, 'center')
+    if (Math.floor(world.realFrame / 30) % 2 === 0) text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 26, 8, 'center')
+  }
+
   if (world.paused) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)

@@ -9,6 +9,8 @@ export type Team = 'agent' | 'gang'
 
 let nextId = 1
 
+const FLASH_PALETTE: Palette = { body: '#ffffff', back: '#dddddd' }
+
 /** 特務與所有敵人的共同基底：位置、物理、命條與繪圖。 */
 export abstract class Fighter {
   readonly id = nextId++
@@ -19,6 +21,8 @@ export abstract class Fighter {
   facing: Facing = 1
   invuln = 0
   alpha = 1
+  /** 被打中後閃白的剩餘幀數。 */
+  flash = 0
   readonly scale: number = 1
   abstract readonly team: Team
   abstract readonly palette: Palette
@@ -73,7 +77,8 @@ export abstract class Fighter {
     ctx.ellipse(x, GROUND_Y + 1, Math.max(4, 10 - this.h * 0.08) * this.scale, 2.5, 0, 0, Math.PI * 2)
     ctx.fill()
     ctx.globalAlpha = this.alpha
-    drawStickman(ctx, this.pose(), x, GROUND_Y - this.h, this.facing, this.palette, this.scale)
+    const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
+    drawStickman(ctx, this.pose(), x, GROUND_Y - this.h, this.facing, palette, this.scale)
     ctx.globalAlpha = 1
   }
 }

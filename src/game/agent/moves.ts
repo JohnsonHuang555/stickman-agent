@@ -1,30 +1,6 @@
 import type { ActionDef } from '../combat/types'
 import { Clip } from '../stickman/clip'
-import type { Pose } from '../stickman/pose'
-import { ATTACK_POSES, POSES } from '../stickman/poses'
-
-/** 預備 → 出手 → 收招 的三段式動畫。 */
-function attackClip(
-  [windup, strike]: readonly Pose[],
-  windupFrames: number,
-  strikeFrames: number,
-  recoverFrames: number,
-  recoverPose: Pose = POSES.idleA,
-): Clip {
-  return new Clip([
-    { pose: windup, dur: windupFrames, blend: 2 },
-    { pose: strike, dur: strikeFrames, blend: 2 },
-    { pose: recoverPose, dur: recoverFrames },
-  ])
-}
-
-/** 空中動作：預備後保持出手姿勢直到落地。 */
-function aerialClip([windup, strike]: readonly Pose[], windupFrames: number): Clip {
-  return new Clip([
-    { pose: windup, dur: windupFrames, blend: 2 },
-    { pose: strike, dur: 1, blend: 2 },
-  ])
-}
+import { ATTACK_POSES, POSES, aerialClip, attackClip } from '../stickman/poses'
 
 const DESPERATION_COST = 8
 

@@ -24,9 +24,12 @@ if (import.meta.env.DEV && location.search.includes('poses')) {
   const keyboard = new Keyboard()
   keyboard.attach(window)
 
-  const world = new World()
+  let world = new World()
   startLoop(
-    () => world.update(keyboard.poll()),
+    () => {
+      world.update(keyboard.poll())
+      if (world.restartRequested) world = new World()
+    },
     () => world.render(ctx),
   )
 }

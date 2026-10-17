@@ -69,6 +69,7 @@ export class Agent extends Fighter {
     this.stateFrame++
     this.animFrame++
     if (this.invuln > 0) this.invuln--
+    if (this.flash > 0) this.flash--
     const cmd = this.buffered && this.buffered.until >= now ? this.buffered.cmd : null
 
     switch (this.state) {
@@ -87,7 +88,7 @@ export class Agent extends Fighter {
         break
       case 'down':
         this.vx *= 0.8
-        if (this.stateFrame >= DOWN_FRAMES) this.setState('getup')
+        if (this.stateFrame >= DOWN_FRAMES && !this.life.isDead) this.setState('getup')
         break
       case 'getup':
         if (this.stateFrame >= GETUP_FRAMES) {
@@ -194,6 +195,16 @@ export class Agent extends Fighter {
     return left === right ? 0 : left ? -1 : 1
   }
 
+  /** 敵人是否該對特務出手（倒地、起身、無敵中都不算）。 */
+  get vulnerable(): boolean {
+    return this.invuln === 0 && this.state !== 'launched' && this.state !== 'down' && this.state !== 'getup'
+  }
+
+  /** 陣亡且倒地演出結束。 */
+  get defeated(): boolean {
+    return this.state === 'down' && this.life.isDead && this.stateFrame > 60
+  }
+
   hurtbox(): Box | null {
     if (this.state === 'down' || this.state === 'getup') return null
     if (this.crouching || this.act?.def === MOVES.sweep) return this.bodyBox(26)
@@ -210,6 +221,7 @@ export class Agent extends Fighter {
 
   receiveHit(spec: HitSpec, dir: Facing): void {
     this.life.damage(spec.damage)
+    this.flash = 4
     this.act = null
     this.crouching = false
     this.facing = (-dir) as Facing

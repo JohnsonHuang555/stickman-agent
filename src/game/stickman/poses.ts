@@ -55,6 +55,31 @@ export const CLIPS = {
   getup: still(POSES.getup),
 } as const
 
+/** 預備 → 出手 → 收招 的三段式動畫。 */
+export function attackClip(
+  [windup, strike]: readonly Pose[],
+  windupFrames: number,
+  strikeFrames: number,
+  recoverFrames: number,
+  recoverPose: Pose = POSES.idleA,
+  /** 進入預備姿勢的補間幀數；敵人用較大的值讓起手更容易看出來。 */
+  windupBlend = 2,
+): Clip {
+  return new Clip([
+    { pose: windup, dur: windupFrames, blend: windupBlend },
+    { pose: strike, dur: strikeFrames, blend: 2 },
+    { pose: recoverPose, dur: recoverFrames },
+  ])
+}
+
+/** 空中動作：預備後保持出手姿勢直到落地。 */
+export function aerialClip([windup, strike]: readonly Pose[], windupFrames: number): Clip {
+  return new Clip([
+    { pose: windup, dur: windupFrames, blend: 2 },
+    { pose: strike, dur: 1, blend: 2 },
+  ])
+}
+
 /** 攻擊姿勢：[預備, 出手]。 */
 export const ATTACK_POSES = {
   punch1: [P(6, [25, 160], [10, 140], [16, 4], [-16, -6]), P(14, [88, 90], [5, 140], [18, 4], [-18, -8])],
@@ -67,4 +92,6 @@ export const ATTACK_POSES = {
   sweep: [P(25, [20, 10], [30, 10], [60, -20], [10, -80]), P(30, [15, 5], [30, 10], [96, 92], [10, -80])],
   spinA: [P(0, [100, 100], [-100, -100], [95, 95], [-60, -30], 10)],
   spinB: [P(0, [-100, -100], [100, 100], [-60, -30], [95, 95], 10)],
+  /** 壯漢的雙手過頂重砸。 */
+  heavySlam: [P(-15, [175, 160], [170, 150], [20, 0], [-20, -10]), P(40, [70, 30], [65, 25], [35, -5], [-25, -20])],
 } as const

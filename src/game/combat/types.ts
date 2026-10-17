@@ -51,6 +51,8 @@ export interface ActionDef {
   /** 起手幾幀內可被 z+x 取消成保命招。 */
   cancelToDesperation?: boolean
   invuln?: boolean
+  /** 霸體：被打只扣血，不會被打斷。 */
+  armor?: boolean
   onStart?: (f: Fighter) => void
   tick?: (f: Fighter, frame: number) => void
 }
