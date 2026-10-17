@@ -433,8 +433,12 @@ export class World {
       this.shake = Math.max(this.shake, 1.5)
       this.sound('shot')
     }
-    // 最後一發打完：順手把空槍往前丟出去（打到人也有傷害）
-    if (gun.uses <= 0) this.throwHeld(f)
+  }
+
+  /** 沒子彈時扣扳機：「喀」一聲並在頭上冒出 CLICK（接著由動作把空槍丟出去）。 */
+  dryFire(f: Fighter): void {
+    this.sound('click')
+    this.popup(f.x, 'CLICK', '#d0d0d0')
   }
 
   /** 從手上往面對的方向開一槍，子彈高度指定（魔王連射用）。 */

@@ -1,6 +1,7 @@
 import type { ActionDef, HitSpec } from '../combat/types'
 import type { Pose } from '../stickman/pose'
-import { ATTACK_POSES, attackClip } from '../stickman/poses'
+import { Clip } from '../stickman/clip'
+import { ATTACK_POSES, POSES, attackClip } from '../stickman/poses'
 import { ITEM_TYPES, type Item, type ItemTypeId } from './itemTypes'
 
 export type ItemUser = 'agent' | 'enemy'
@@ -63,6 +64,30 @@ function fire(windup: number, recover: number, extra: number): ActionDef {
   }
 }
 
+/**
+ * 沒子彈時扣扳機：舉槍 →「喀」一聲 → 停頓（發現沒子彈）→ 把空槍往前丟。
+ * 和開槍分開，丟出去的槍才不會跟最後一發子彈一起飛出去。
+ */
+function dryFire(extra: number): ActionDef {
+  const aim = 4 + extra
+  const click = aim + 2
+  const release = aim + 18
+  return {
+    clip: new Clip([
+      { pose: ATTACK_POSES.aim[0], dur: aim, blend: extra ? 8 : 2 },
+      { pose: ATTACK_POSES.aim[0], dur: 12 },
+      { pose: ATTACK_POSES.throw[0], dur: 6, blend: 4 },
+      { pose: ATTACK_POSES.throw[1], dur: 6, blend: 2 },
+      { pose: POSES.idleA, dur: 10 },
+    ]),
+    length: release + 16,
+    tick: (f, frame, world) => {
+      if (frame === click) world.dryFire(f)
+      if (frame === release) world.throwHeld(f)
+    },
+  }
+}
+
 function throwAction(extra: number): ActionDef {
   const w = 6 + extra
   return {
@@ -84,20 +109,21 @@ function buildActions(user: ItemUser) {
     pistol: fire(4, 10, e.firearm),
     shotgun: fire(8, 18, e.firearm),
     throw: throwAction(e.throw),
+    dryFire: dryFire(e.firearm ? 6 : 0),
   }
 }
 
 const ACTIONS = { agent: buildActions('agent'), enemy: buildActions('enemy') }
 
-/** 持有物件時按 z 的動作。投擲物一律丟出；沒子彈的槍改用槍托。 */
+/** 持有物件時按 z 的動作。投擲物一律丟出；沒子彈的槍空扣一下再丟出。 */
 export function itemAction(item: Item, user: ItemUser): ActionDef {
   const a = ACTIONS[user]
   switch (ITEM_TYPES[item.type].category) {
     case 'melee':
       return a[item.type as keyof typeof SWINGS]
     case 'firearm':
-      // 沒子彈的槍（例如撿到被丟掉的空槍）按 Z 直接丟出去
-      return item.uses > 0 ? a[item.type as 'pistol' | 'shotgun'] : a.throw
+      // 沒子彈的槍：空扣「喀」一聲，停頓一下再往前丟
+      return item.uses > 0 ? a[item.type as 'pistol' | 'shotgun'] : a.dryFire
     default:
       return a.throw
   }

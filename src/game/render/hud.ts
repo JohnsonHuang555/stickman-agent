@@ -79,17 +79,24 @@ function drawCombo(ctx: CanvasRenderingContext2D, world: World): void {
 /** 背包格：命條右邊的小格子，畫出裡面的東西；放槍時顯示子彈數。 */
 function drawBag(ctx: CanvasRenderingContext2D, world: World): void {
   const x = 162
-  const y = 16
-  text(ctx, 'BAG', x + 22, y + 2, 6)
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'
-  ctx.fillRect(x, y, 18, 13)
-  ctx.strokeStyle = 'rgba(255,255,255,0.6)'
-  ctx.lineWidth = 1
-  ctx.strokeRect(x + 0.5, y + 0.5, 17, 12)
+  const y = 15
+  const w = 24
+  const h = 16
+  text(ctx, 'BAG', x + w + 4, y + 2, 6)
+  // 淺色底：槍這類深色的東西放進來才看得清楚
+  ctx.fillStyle = '#ece6da'
+  ctx.fillRect(x, y, w, h)
+  ctx.strokeStyle = '#1a1420'
+  ctx.lineWidth = 1.5
+  ctx.strokeRect(x + 0.75, y + 0.75, w - 1.5, h - 1.5)
   const bag = world.agent.bag
   if (!bag) return
-  drawItemFlying(ctx, bag.type, x + 9, y + 6.5, 0)
-  if (ITEM_TYPES[bag.type].category === 'firearm') text(ctx, `x${bag.uses}`, x + 22, y + 10, 6)
+  ctx.save()
+  ctx.translate(x + w / 2, y + h / 2)
+  ctx.scale(1.5, 1.5)
+  drawItemFlying(ctx, bag.type, 0, 0, 0)
+  ctx.restore()
+  if (ITEM_TYPES[bag.type].category === 'firearm') text(ctx, `x${bag.uses}`, x + w + 4, y + 11, 6)
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {

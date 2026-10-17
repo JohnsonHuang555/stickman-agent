@@ -136,14 +136,26 @@ describe('firearms', () => {
     expect(damageOf(grunt)).toBe(10)
   })
 
-  it('firing the last bullet automatically throws the empty gun forward', () => {
+  it('after the last bullet the gun stays in hand; the next trigger pull clicks, pauses, then throws it', () => {
     const { world, agent, grunt } = setup([60])
     agent.held = newItem('pistol', 1)
     tick(world, ['punch'])
     run(world, 40)
-    expect(agent.held).toBeNull()
-    expect(damageOf(grunt)).toBe(12 + 10) // 子彈 12 + 丟出去的槍 10
-    expect(world.items.some((i) => i.item.type === 'pistol')).toBe(true)
+    expect(agent.held).toEqual({ type: 'pistol', uses: 0 }) // 子彈和槍不會一起飛出去
+    expect(damageOf(grunt)).toBe(12)
+
+    tick(world, ['punch'])
+    let clickedAt = -1
+    let thrownAt = -1
+    for (let i = 1; i <= 40; i++) {
+      tick(world)
+      if (clickedAt < 0 && world.popups.some((p) => p.text === 'CLICK')) clickedAt = i
+      if (thrownAt < 0 && !agent.held) thrownAt = i
+    }
+    expect(clickedAt).toBeGreaterThan(0)
+    expect(thrownAt - clickedAt).toBeGreaterThanOrEqual(12) // 「發現沒子彈」的停頓
+    run(world, 20)
+    expect(damageOf(grunt)).toBe(12 + 10) // 丟出去的槍打中
   })
 
   it('an armed gunman throws his gun after his last shot and keeps fighting with his fists', () => {

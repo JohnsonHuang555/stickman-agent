@@ -5,6 +5,7 @@ export type Sound =
   | 'hurt'
   | 'shot'
   | 'shotgun'
+  | 'click'
   | 'throw'
   | 'break'
   | 'pickup'
@@ -96,6 +97,11 @@ export function play(sound: Sound): void {
     case 'shotgun':
       burst(0.3, 1, 2500)
       tone('square', 300, 50, 0.2, 0.35)
+      break
+    case 'click':
+      // 空膛：扣下扳機卻沒有子彈的「喀」
+      tone('square', 1900, 1400, 0.03, 0.18)
+      tone('square', 1200, 900, 0.03, 0.12, 0.05)
       break
     case 'throw':
       burst(0.15, 0.25, 600)
