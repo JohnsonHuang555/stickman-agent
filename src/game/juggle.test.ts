@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LAUNCH_VELOCITY } from './agent/moves'
 import type { HitSpec } from './combat/types'
 import { Grunt, JUGGLE_LIMIT } from './enemies/grunt'
 import type { Button } from './input/buttons'
@@ -24,7 +25,7 @@ function setup(type: 'thug' | 'heavy' = 'thug') {
 }
 
 const JAB: HitSpec = { from: 0, to: 0, box: { forward: 0, up: 0, w: 1, h: 1 }, damage: 1, hitstun: 10, knockback: 0.4 }
-const LAUNCH: HitSpec = { ...JAB, launch: 7.6 }
+const LAUNCH: HitSpec = { ...JAB, launch: LAUNCH_VELOCITY }
 const SPIKE: HitSpec = { ...JAB, spike: true, knockdown: true }
 
 /** ↑+Z → 跳 → Z → Z → X，每步之間等對的幀數。 */
@@ -267,5 +268,48 @@ describe('human-paced timing (regression for "the air combo is hard to land")', 
     tick(world, ['punch'])
     run(world, 10)
     expect(damage()).toBe(8 + 5 + 6)
+  })
+})
+
+describe('air feel (regression for "enemies freeze in the air")', () => {
+  it('a juggled grunt tumbles, and the tumble resets once it is down', () => {
+    const { world, grunt } = setup()
+    grunt.receiveHit(LAUNCH, 1, world)
+    run(world, 6)
+    grunt.receiveHit(JAB, 1, world)
+    run(world, 6)
+    expect(Math.abs(grunt.rotation)).toBeGreaterThan(0.3)
+    for (let i = 0; i < 120 && grunt.h > 0; i++) tick(world)
+    run(world, 2)
+    expect(grunt.rotation).toBe(0)
+  })
+
+  it('without more hits, a juggled grunt drops from its apex within about 0.4s instead of hovering', () => {
+    const { world, grunt } = setup()
+    grunt.receiveHit(LAUNCH, 1, world)
+    let apex = 0
+    for (let i = 0; i < 60 && grunt.vh > 0; i++) {
+      tick(world)
+      apex = Math.max(apex, grunt.h)
+    }
+    expect(apex).toBeGreaterThan(55)
+    expect(apex).toBeLessThan(85) // 接近特務跳躍的最高點（約 64px），不會飛得太高
+    let framesToLand = 0
+    while (grunt.h > 0 && framesToLand < 60) {
+      tick(world)
+      framesToLand++
+    }
+    expect(framesToLand).toBeLessThanOrEqual(26)
+  })
+
+  it('every juggle hit visibly pushes the grunt back a little, but not out of reach', () => {
+    const { world, grunt } = setup()
+    grunt.receiveHit(LAUNCH, 1, world)
+    run(world, 10)
+    const x0 = grunt.x
+    grunt.receiveHit(JAB, 1, world)
+    run(world, 20)
+    expect(grunt.x - x0).toBeGreaterThan(3)
+    expect(grunt.x - x0).toBeLessThan(8)
   })
 })

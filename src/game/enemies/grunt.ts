@@ -24,8 +24,12 @@ const MEDKIT_DROP_CHANCE = 0.1
 export const JUGGLE_LIMIT = 5
 /** 浮空中被打中時往上彈的速度（直接重設，敵人才會停在特務附近的高度）。 */
 const JUGGLE_POP = 3
+/** 被追擊時至少往上彈這麼多，看得出被打中的反應。 */
+const JUGGLE_POP_MIN = 1.2
 /** 浮空時的重力（一般為 0.42），讓敵人在空中停留得久一點，人比較接得上。 */
-const JUGGLE_GRAVITY = 0.25
+const JUGGLE_RISE_GRAVITY = 0.22
+/** 下墜時重力較大：上升時飄、下墜俐落，不會像懸浮在空中。 */
+const JUGGLE_FALL_GRAVITY = 0.3
 const SPIKE_VELOCITY = -6
 const SPIKE_BOUNCE = 3.2
 
@@ -91,6 +95,8 @@ export class Grunt extends Enemy {
   private juggleHits = 0
   /** 被下砸中，著地時要反彈。 */
   private spiked = false
+  /** 翻滾的角速度（弧度／幀）。 */
+  private spin = 0
   private target: ItemEntity | null = null
   /** 每個雜兵徘徊距離略有不同，避免疊在一起。 */
   private readonly hoverJitter = rand(-10, 25)
@@ -189,6 +195,10 @@ export class Grunt extends Enemy {
         break
       case 'launched':
       case 'juggled':
+        // 在空中翻滾；空氣阻力讓往後退的速度慢慢變小
+        this.rotation += this.spin
+        this.spin *= 0.97
+        if (this.state === 'juggled') this.vx *= 0.88
         break
       case 'down':
         this.vx *= 0.7
@@ -207,11 +217,14 @@ export class Grunt extends Enemy {
       if (this.spiked) {
         // 被下砸踢砸到地上：反彈一次再倒地
         this.spiked = false
+        this.spin = -this.spin * 0.5
         this.vh = SPIKE_BOUNCE
         this.vx *= 0.5
         this.setState('launched')
         world.quake(3)
       } else if (this.state === 'launched' || this.state === 'juggled') {
+        this.rotation = 0
+        this.spin = 0
         this.setState('down')
         this.vx *= 0.4
       }
@@ -344,6 +357,7 @@ export class Grunt extends Enemy {
       }
       this.setState('launched')
       this.bumpIds = new Set([this.id])
+      this.spin = dir * 0.1
       this.vx = dir * Math.max(2.4, spec.knockback)
       this.vh = 3.4
     } else {
@@ -366,6 +380,7 @@ export class Grunt extends Enemy {
       this.juggleHits = 1
       this.vh = spec.launch
       this.vx = 0 // 垂直往上飛，比較好追
+      this.spin = dir * 0.08
       return true
     }
 
@@ -375,21 +390,25 @@ export class Grunt extends Enemy {
       this.setState('launched')
       this.vh = SPIKE_VELOCITY
       this.vx = dir * 1
+      this.spin = dir * 0.3
     } else if (this.juggleHits >= JUGGLE_LIMIT) {
       this.setState('launched')
       this.vh = Math.max(this.vh, 2)
       this.vx = dir * 1.5
+      this.spin = dir * 0.2
     } else {
       // 比特務高就彈得少、比特務低就彈得多，讓敵人一直停在特務附近的高度
       const above = this.h - world.agent.h
-      this.vh = spec.launch ?? Math.min(JUGGLE_POP + 1, Math.max(0.8, JUGGLE_POP - above * 0.08))
-      this.vx = dir * 0.2
+      this.vh = spec.launch ?? Math.min(JUGGLE_POP + 1, Math.max(JUGGLE_POP_MIN, JUGGLE_POP - above * 0.08))
+      this.vx = dir * 0.6 // 搭配空氣阻力，每下約往後退 5px：看得出被打退，又不會飄出攻擊範圍
+      this.spin = dir * 0.16
     }
     return true
   }
 
   protected currentGravity(): number {
-    return this.state === 'juggled' ? JUGGLE_GRAVITY : this.gravity
+    if (this.state !== 'juggled') return this.gravity
+    return this.vh > 0 ? JUGGLE_RISE_GRAVITY : JUGGLE_FALL_GRAVITY
   }
 
   /** 正在空中被追擊。 */

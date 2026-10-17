@@ -452,10 +452,12 @@ export class World {
             ? attacker.vx < 0 ? -1 : 1
             : target.x === attacker.x ? attacker.facing : target.x > attacker.x ? 1 : -1
         const wasAlive = !target.life.isDead
+        const wasJuggled = target instanceof Grunt && target.juggled
         target.receiveHit(hit.spec, dir, this)
         attacker.onHitLanded?.(this)
 
-        this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : 4)
+        // 空中追擊的輕擊頓幀較短，連段才流暢、敵人不會像定格在空中
+        this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : wasJuggled ? 2 : 4)
         this.sound(target === this.agent ? 'hurt' : hit.spec.heavy ? 'heavyHit' : 'hit')
         if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
 

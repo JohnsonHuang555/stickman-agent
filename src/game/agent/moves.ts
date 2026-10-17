@@ -10,9 +10,9 @@ const punchStep = (f: Fighter, frame: number) => {
   f.vx = frame >= 1 && frame <= 3 ? f.facing * 1 : 0
 }
 
-/** 空中出招時幾乎停在半空，讓空中連段接得起來。 */
-const airHang = (f: Fighter) => {
-  f.vh = Math.max(f.vh, -0.4)
+/** 空中出招：出手那幾幀幾乎停在半空，收招時慢慢往下掉（不會一直懸在空中）。 */
+const airHang = (f: Fighter, frame: number) => {
+  f.vh = Math.max(f.vh, frame <= 6 ? -0.4 : -0.8)
   f.vx *= 0.85
 }
 
@@ -22,7 +22,8 @@ const airRise = (f: Fighter) => {
 }
 
 /** 挑空技把雜兵打上空中的初速。 */
-export const LAUNCH_VELOCITY = 6.4
+// 搭配浮空上升重力 0.22：最高約 71px，接近特務跳躍的最高點
+export const LAUNCH_VELOCITY = 5.6
 
 // 判定距離（身體中心到前緣）：拳約 26px、踢約 34px；起手幀數比初版短約 20%
 export const MOVES = {
@@ -100,7 +101,8 @@ export const MOVES = {
     hit: {
       from: 3,
       to: 7,
-      box: { forward: -2, up: -6, w: 32, h: 42 },
+      // 往下踩：判定向下延伸，敵人掉到腳下也踩得到
+      box: { forward: -4, up: -30, w: 34, h: 74 },
       damage: 10,
       hitstun: 24,
       knockback: 1.5,
@@ -110,7 +112,7 @@ export const MOVES = {
     },
     onStart: airRise,
     tick: (f, frame) => {
-      if (frame < 3) airHang(f)
+      if (frame < 3) airHang(f, frame)
     },
   },
   flyingKick: {

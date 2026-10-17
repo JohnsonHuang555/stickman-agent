@@ -26,6 +26,8 @@ export abstract class Fighter implements Hitter {
   flash = 0
   /** 同時只能持有一件。 */
   held: Item | null = null
+  /** 只用於外觀：整個身體的旋轉角度（弧度），被打飛翻滾時使用。 */
+  rotation = 0
   /** 只用於外觀：後手拿的東西（雙刀劍客）。 */
   heldBack: Item | null = null
   readonly scale: number = 1
@@ -140,10 +142,19 @@ export abstract class Fighter implements Hitter {
     ctx.globalAlpha = this.alpha
     const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
     const footY = GROUND_Y - this.h
+    ctx.save()
+    if (this.rotation) {
+      // 以身體中段為軸翻滾
+      const pivotY = footY - 22 * this.scale
+      ctx.translate(x, pivotY)
+      ctx.rotate(this.rotation)
+      ctx.translate(-x, -pivotY)
+    }
     if (this.heldBack) drawItemHeld(ctx, this.heldBack.type, backHand(pose, x, footY, this.facing, this.scale))
     drawStickman(ctx, pose, x, footY, this.facing, palette, this.scale)
     this.drawCostume(ctx, pose, x, footY)
     if (this.held) drawItemHeld(ctx, this.held.type, frontHand(pose, x, footY, this.facing, this.scale))
+    ctx.restore()
     ctx.globalAlpha = 1
   }
 
