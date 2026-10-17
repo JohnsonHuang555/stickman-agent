@@ -52,9 +52,11 @@ export const POSES = {
 export const WALK_CYCLE_DISTANCE = 44
 /** 腳離骨盆最遠的水平距離（一步 22px）。 */
 const STEP_HALF = WALK_CYCLE_DISTANCE / 4
-/** 支撐腳伸到腿長的這個比例：經過身體正下方時腿幾乎打直，骨盆因此自然上下起伏。 */
+/** 支撐腳伸到腿長的這個比例：經過身體正下方時腿幾乎打直，骨盆因此自然上下起伏（太直的話另一隻腳得彎很多才離得了地）。 */
 const STANCE_REACH = 0.97
-const SWING_LIFT = 6
+/** 抬腳離地的高度：剛好擦過地面，膝蓋不會抬太高。 */
+/** 抬腳離地的高度：剛好擦過地面，膝蓋只比站姿高一點，不會抬太高。 */
+const SWING_LIFT = 2
 /** 走路時護架跟著步伐晃動的角度。 */
 const GUARD_SWAY = 6
 

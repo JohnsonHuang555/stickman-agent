@@ -91,3 +91,19 @@ describe('walk posture (regression for "crouch-walking")', () => {
     expect(bob).toBeLessThan(6)
   })
 })
+
+describe('walk leg lift (regression for "legs lift too high")', () => {
+  it('the swinging foot barely clears the ground and the knee stays near its standing height', () => {
+    const stand = posePoints(POSES.idleA)
+    const standingKnee = Math.max(stand[6][1], stand[8][1])
+    let foot = 0
+    let knee = 0
+    for (let i = 0; i < 64; i++) {
+      const p = posePoints(walkPose((i / 64) * WALK_CYCLE_DISTANCE))
+      foot = Math.max(foot, p[7][1], p[9][1])
+      knee = Math.max(knee, p[6][1], p[8][1])
+    }
+    expect(foot).toBeLessThanOrEqual(3)
+    expect(knee - standingKnee).toBeLessThan(2.5)
+  })
+})
