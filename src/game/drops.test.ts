@@ -77,8 +77,9 @@ describe('crates', () => {
 })
 
 describe('medkits and score items', () => {
-  it('walking onto a medkit heals 40%, spilling over into the previous bar', () => {
+  it('with the bag full, walking onto a medkit heals 40%, spilling over into the previous bar', () => {
     const world = sandbox()
+    world.agent.bag = newItem('pistol') // 背包滿了才會直接補血
     world.agent.life.damage(130)
     world.placeItem('medkit', 340)
     run(world, 40, ['right'])
@@ -90,6 +91,7 @@ describe('medkits and score items', () => {
   it('a medkit is picked up even while holding a weapon, and the weapon stays in hand', () => {
     const world = sandbox()
     world.agent.held = newItem('bat')
+    world.agent.bag = newItem('pistol')
     world.agent.life.damage(50)
     world.placeItem('medkit', 300)
     tick(world)
@@ -107,8 +109,9 @@ describe('medkits and score items', () => {
     expect(world.agent.held).toBeNull()
   })
 
-  it('at full life a medkit stays on the floor for later', () => {
+  it('with the bag full and at full life, a medkit stays on the floor for later', () => {
     const world = sandbox()
+    world.agent.bag = newItem('pistol')
     world.placeItem('medkit', 300)
     tick(world)
     expect(world.items).toHaveLength(1)
@@ -139,7 +142,8 @@ describe('enemy drops', () => {
     grunt.life.damage(grunt.life.hp - 1)
     punch(world)
     run(world, 40)
-    expect(world.items.some((i) => i.item.type === 'medkit')).toBe(true)
+    // 掉出來的醫療箱可能已經被收進背包
+    expect(world.items.some((i) => i.item.type === 'medkit') || world.agent.bag?.type === 'medkit').toBe(true)
   })
 
   it('but usually does not', () => {

@@ -348,7 +348,7 @@ export class World {
       if (!e.pickable) continue
       const category = categoryOf(e.item)
       if (category === 'consumable') continue
-      if (category === 'ammo' && !(f.held && categoryOf(f.held) === 'firearm')) continue
+      if (category === 'ammo' && !this.gunToReload(f)) continue
       const d = Math.abs(e.x - f.x)
       if (d <= PICKUP_REACH && (!best || d < Math.abs(best.x - f.x))) best = e
     }
@@ -358,11 +358,52 @@ export class World {
   takeItem(e: ItemEntity, f: Fighter): void {
     e.removed = true
     if (categoryOf(e.item) === 'ammo') {
-      if (f.held) f.held.uses += e.item.uses
+      const gun = this.gunToReload(f)
+      if (gun) gun.uses += e.item.uses
     } else {
       f.held = e.item
       this.sound('pickup')
     }
+  }
+
+  /** 彈藥包要補的槍：優先手上的槍，其次背包裡的槍。 */
+  private gunToReload(f: Fighter): Item | null {
+    if (f.held && categoryOf(f.held) === 'firearm') return f.held
+    if (f.bag && categoryOf(f.bag) === 'firearm') return f.bag
+    return null
+  }
+
+  /**
+   * V 鍵（背包）：
+   * - 背包有醫療箱 → 使用（滿血時不用，避免浪費）
+   * - 背包有槍 → 掏出來；手上是槍就互換，手上是其他東西就丟到地上
+   * - 背包空著、手上拿槍 → 把槍收進背包
+   * 回傳是否有動作。
+   */
+  useBag(f: Fighter): boolean {
+    const bag = f.bag
+    if (bag?.type === 'medkit') {
+      if (f.life.hp >= f.life.max) return false
+      f.life.heal(bag.uses)
+      f.bag = null
+      this.popup(f.x, 'HEAL', '#7dff8a')
+      this.sound('heal')
+      return true
+    }
+    if (bag && categoryOf(bag) === 'firearm') {
+      if (f.held && categoryOf(f.held) !== 'firearm') this.dropHeld(f)
+      f.bag = f.held
+      f.held = bag
+      this.sound('pickup')
+      return true
+    }
+    if (!bag && f.held && categoryOf(f.held) === 'firearm') {
+      f.bag = f.held
+      f.held = null
+      this.sound('pickup')
+      return true
+    }
+    return false
   }
 
   throwHeld(f: Fighter): void {
@@ -392,6 +433,8 @@ export class World {
       this.shake = Math.max(this.shake, 1.5)
       this.sound('shot')
     }
+    // 最後一發打完：順手把空槍往前丟出去（打到人也有傷害）
+    if (gun.uses <= 0) this.throwHeld(f)
   }
 
   /** 從手上往面對的方向開一槍，子彈高度指定（魔王連射用）。 */
@@ -528,7 +571,15 @@ export class World {
     if (agent.airborne || agent.life.isDead) return
     for (const e of this.items) {
       if (!e.pickable || categoryOf(e.item) !== 'consumable' || Math.abs(e.x - agent.x) > CONSUME_REACH) continue
-      // 滿血時醫療箱留在地上，需要時再回來拿
+      // 背包空著：醫療箱收進背包，之後按 V 使用
+      if (e.item.type === 'medkit' && !agent.bag) {
+        e.removed = true
+        agent.bag = e.item
+        this.popup(e.x, 'BAG', '#7dff8a')
+        this.sound('pickup')
+        continue
+      }
+      // 背包滿了就直接補血；滿血時醫療箱留在地上，需要時再回來拿
       if (e.item.type === 'medkit' && agent.life.hp >= agent.life.max) continue
       e.removed = true
       if (e.item.type === 'medkit') {

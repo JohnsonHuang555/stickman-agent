@@ -126,13 +126,34 @@ describe('firearms', () => {
     expect(agent.held?.uses).toBe(3)
   })
 
-  it('an empty gun bashes with the stock instead', () => {
+  it('z with an empty gun (e.g. picked up after being discarded) throws it', () => {
     const { world, agent, grunt } = setup([14])
     agent.held = newItem('pistol', 0)
     tick(world, ['punch'])
     run(world, 30)
     expect(world.bullets).toHaveLength(0)
-    expect(damageOf(grunt)).toBe(6)
+    expect(agent.held).toBeNull()
+    expect(damageOf(grunt)).toBe(10)
+  })
+
+  it('firing the last bullet automatically throws the empty gun forward', () => {
+    const { world, agent, grunt } = setup([60])
+    agent.held = newItem('pistol', 1)
+    tick(world, ['punch'])
+    run(world, 40)
+    expect(agent.held).toBeNull()
+    expect(damageOf(grunt)).toBe(12 + 10) // 子彈 12 + 丟出去的槍 10
+    expect(world.items.some((i) => i.item.type === 'pistol')).toBe(true)
+  })
+
+  it('an armed gunman throws his gun after his last shot and keeps fighting with his fists', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.agent.x = 300
+    const gunman = new Grunt(450, 'gunman', { held: newItem('pistol', 1) })
+    world.enemies = [gunman]
+    for (let i = 0; i < 600 && gunman.held; i++) tick(world)
+    expect(gunman.held).toBeNull()
+    expect(world.items.some((i) => i.item.type === 'pistol' && i.item.uses === 0)).toBe(true)
   })
 })
 

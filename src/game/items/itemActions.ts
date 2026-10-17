@@ -52,11 +52,6 @@ const SWINGS: Record<'bat' | 'crowbar' | 'knife' | 'katana', SwingParams> = {
   },
 }
 
-const BUTT: SwingParams = {
-  poses: ATTACK_POSES.punch1, windup: 6, strike: 3, recover: 10, reach: 22, up: 26, h: 12,
-  damage: 6, hitstun: 16, knockback: 1.5,
-}
-
 function fire(windup: number, recover: number, extra: number): ActionDef {
   const w = windup + extra
   return {
@@ -88,7 +83,6 @@ function buildActions(user: ItemUser) {
     katana: swing(SWINGS.katana, e.melee),
     pistol: fire(4, 10, e.firearm),
     shotgun: fire(8, 18, e.firearm),
-    butt: swing(BUTT, e.melee, false),
     throw: throwAction(e.throw),
   }
 }
@@ -102,7 +96,8 @@ export function itemAction(item: Item, user: ItemUser): ActionDef {
     case 'melee':
       return a[item.type as keyof typeof SWINGS]
     case 'firearm':
-      return item.uses > 0 ? a[item.type as 'pistol' | 'shotgun'] : a.butt
+      // 沒子彈的槍（例如撿到被丟掉的空槍）按 Z 直接丟出去
+      return item.uses > 0 ? a[item.type as 'pistol' | 'shotgun'] : a.throw
     default:
       return a.throw
   }
@@ -119,7 +114,7 @@ export function itemRange(item: Item): number {
     case 'melee':
       return SWINGS[type as keyof typeof SWINGS].reach - 4
     case 'firearm':
-      if (item.uses <= 0) return BUTT.reach
+      if (item.uses <= 0) return 150 // 空槍：丟出去
       return type === 'shotgun' ? 110 : 230
     default:
       return 150

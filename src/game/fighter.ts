@@ -28,6 +28,8 @@ export abstract class Fighter implements Hitter {
   held: Item | null = null
   /** 只用於外觀：整個身體的旋轉角度（弧度），被打飛翻滾時使用。 */
   rotation = 0
+  /** 背包：手以外的一格，可放一把槍或一個醫療箱（只有特務會用）。 */
+  bag: Item | null = null
   /** 只用於外觀：後手拿的東西（雙刀劍客）。 */
   heldBack: Item | null = null
   readonly scale: number = 1

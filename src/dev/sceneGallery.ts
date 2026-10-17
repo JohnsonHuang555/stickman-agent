@@ -9,6 +9,7 @@ export function sceneGallery(floor: number, camX: number, combo = 0) {
   world.camX = camX
   world.agent.x = camX + 140
   world.agent.held = newItem('bat')
+  world.agent.bag = newItem('pistol', 5)
   world.enemies = [
     new Grunt(camX + 220, 'thug', { passive: true }),
     new Grunt(camX + 280, 'bruiser', { passive: true }),

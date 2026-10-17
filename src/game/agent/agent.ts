@@ -59,6 +59,7 @@ export class Agent extends Fighter {
   private buffered: { cmd: Command; until: number } | null = null
   private jumpUntil = -1
   private grabUntil = -1
+  private bagUntil = -1
   private crouching = false
   private walking = false
   private airAttackUsed = false
@@ -87,6 +88,7 @@ export class Agent extends Fighter {
     if (cmd) this.buffered = { cmd, until: realFrame + COMMAND_BUFFER }
     if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
     if (snapshot.pressed.includes('grab')) this.grabUntil = realFrame + COMMAND_BUFFER
+    if (snapshot.pressed.includes('bag')) this.bagUntil = realFrame + COMMAND_BUFFER
   }
 
   update(world: World): void {
@@ -135,6 +137,11 @@ export class Agent extends Fighter {
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
     if (cmd && this.tryStart(cmd)) return
+    // V：背包（收槍／掏槍／用醫療箱），空中也可以用
+    if (this.bagUntil >= now) {
+      this.bagUntil = -1
+      world.useBag(this)
+    }
     if (this.airborne) {
       this.steerInAir()
       return

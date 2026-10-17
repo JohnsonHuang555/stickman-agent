@@ -256,6 +256,7 @@ export class Grunt extends Enemy {
     for (const item of world.items) {
       if (!item.pickable || (item.reservedBy !== null && item.reservedBy !== this.id)) continue
       if (!this.def.pickups.includes(categoryOf(item.item))) continue
+      if (categoryOf(item.item) === 'firearm' && item.item.uses <= 0) continue // 空槍不撿
       const d = Math.abs(item.x - this.x)
       if (d <= FETCH_RADIUS && (!best || d < Math.abs(best.x - this.x))) best = item
     }

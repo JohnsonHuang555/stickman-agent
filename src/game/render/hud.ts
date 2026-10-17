@@ -1,5 +1,6 @@
 import { VIEW_H, VIEW_W } from '../constants'
 import { floorLabel } from '../../leaderboard/leaderboard'
+import { drawItemFlying } from '../items/itemArt'
 import { ITEM_TYPES } from '../items/itemTypes'
 import type { LifePool } from '../life/lifePool'
 import type { World } from '../world'
@@ -75,6 +76,22 @@ function drawCombo(ctx: CanvasRenderingContext2D, world: World): void {
   if (combo.multiplier > 1) text(ctx, `SCORE x${combo.multiplier}`, x, y + (rating ? 28 : 16), 6, 'right')
 }
 
+/** 背包格：命條右邊的小格子，畫出裡面的東西；放槍時顯示子彈數。 */
+function drawBag(ctx: CanvasRenderingContext2D, world: World): void {
+  const x = 162
+  const y = 16
+  text(ctx, 'BAG', x + 22, y + 2, 6)
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'
+  ctx.fillRect(x, y, 18, 13)
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'
+  ctx.lineWidth = 1
+  ctx.strokeRect(x + 0.5, y + 0.5, 17, 12)
+  const bag = world.agent.bag
+  if (!bag) return
+  drawItemFlying(ctx, bag.type, x + 9, y + 6.5, 0)
+  if (ITEM_TYPES[bag.type].category === 'firearm') text(ctx, `x${bag.uses}`, x + 22, y + 10, 6)
+}
+
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   // 淡色背景上白字不好讀：在上方資訊與下方操作說明後面墊一條半透明深色底
   ctx.fillStyle = 'rgba(20,16,24,0.45)'
@@ -90,6 +107,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     const suffix = category === 'firearm' ? ` x${held.uses}` : category === 'melee' ? ` ${'|'.repeat(held.uses)}` : ''
     text(ctx, ITEM_TYPES[held.type].label + suffix, 44, 30, 6)
   }
+  drawBag(ctx, world)
 
   const boss = world.boss
   if (boss && !boss.removed) {
@@ -151,7 +169,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  ↑Z 挑空→跳起 Z Z X  ↓空中Z 下砸  Z+X 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
+  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  V 背包  ↑Z 挑空→跳起 Z Z X  ↓空中Z 下砸  Z+X 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
 
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
