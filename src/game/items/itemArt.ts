@@ -1,7 +1,7 @@
 import { GROUND_Y } from '../constants'
 import type { ItemTypeId } from './itemTypes'
 
-const BLOCKS: ReadonlySet<ItemTypeId> = new Set(['chair', 'cabinet', 'desk', 'ammo'])
+const BLOCKS: ReadonlySet<ItemTypeId> = new Set(['chair', 'cabinet', 'desk', 'ammo', 'medkit', 'cash', 'gold'])
 /** 長條物件的長度，用來在地上置中擺放。 */
 const LENGTH: Partial<Record<ItemTypeId, number>> = { bat: 21, crowbar: 20, knife: 11, katana: 32, pistol: 9, shotgun: 24 }
 
@@ -87,6 +87,31 @@ function drawBlock(ctx: CanvasRenderingContext2D, type: ItemTypeId): void {
       ctx.fillStyle = '#e8d27a'
       ctx.fillRect(-2, -1.5, 4, 1)
       break
+    case 'medkit':
+      ctx.fillStyle = '#f4f4f4'
+      ctx.fillRect(-5, -4, 10, 8)
+      ctx.fillStyle = '#d42a2a'
+      ctx.fillRect(-1, -3, 2, 6)
+      ctx.fillRect(-3, -1, 6, 2)
+      break
+    case 'cash':
+      ctx.fillStyle = '#4a8a3a'
+      ctx.fillRect(-6, -2.5, 12, 5)
+      ctx.fillStyle = '#9fd28a'
+      ctx.fillRect(-2, -2.5, 4, 5)
+      break
+    case 'gold':
+      ctx.fillStyle = '#e8c33a'
+      ctx.beginPath()
+      ctx.moveTo(-6, 3)
+      ctx.lineTo(6, 3)
+      ctx.lineTo(4, -2)
+      ctx.lineTo(-4, -2)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#fff3a8'
+      ctx.fillRect(-3, -1, 3, 1)
+      break
     default:
       break
   }
@@ -115,7 +140,7 @@ export function drawItemHeld(
 export function drawItemOnGround(ctx: CanvasRenderingContext2D, type: ItemTypeId, x: number, liftY: number): void {
   ctx.save()
   if (BLOCKS.has(type)) {
-    const half = type === 'cabinet' ? 12 : type === 'chair' ? 9 : 3
+    const half = type === 'cabinet' ? 12 : type === 'chair' ? 9 : type === 'desk' ? 7 : type === 'medkit' ? 4 : 3
     ctx.translate(x, GROUND_Y - half - liftY)
     drawBlock(ctx, type)
   } else {

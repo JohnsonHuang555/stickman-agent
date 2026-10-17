@@ -13,6 +13,7 @@ import { Bullet } from './items/bullet'
 import { ItemEntity } from './items/itemEntity'
 import { categoryOf, newItem, type Item, type ItemTypeId } from './items/itemTypes'
 import { FLOORS, type FloorDef, type Spawn, type Theme } from './level/floors'
+import { Crate } from './level/crate'
 import { ZoneDirector } from './level/zoneDirector'
 import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
@@ -25,6 +26,12 @@ const SEPARATION = 14
 const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
 const BOSS_BANNER_FRAMES = 150
+const POPUP_FRAMES = 50
+/** 自動撿起醫療箱、分數道具的距離。 */
+const CONSUME_REACH = 12
+
+/** 子彈命中後消失、丟出的物件碎掉或已經命中過，就不再打中其他目標。 */
+const spent = (h: Hitter) => (h as { removed?: boolean }).removed || !h.activeHit()
 /** 魔王倒下到顯示 MISSION COMPLETE 的幀數。 */
 const MISSION_CLEAR_DELAY = 150
 const CLEAR_FRAMES = 200
@@ -71,6 +78,9 @@ export class World {
   enemies: Enemy[] = []
   items: ItemEntity[] = []
   bullets: Bullet[] = []
+  crates: Crate[] = []
+  /** 撿到道具時浮起的文字。 */
+  popups: { x: number; text: string; color: string; born: number }[] = []
 
   realFrame = 0
   score = 0
@@ -112,6 +122,7 @@ export class World {
         ['chair', 160], ['knife', 420], ['cabinet', 600], ['katana', 820], ['shotgun', 1050], ['chair', 1250],
       ]
       for (const [type, x] of layout) this.placeItem(type, x)
+      this.crates = [new Crate(300), new Crate(700), new Crate(1150)]
     }
   }
 
@@ -134,6 +145,8 @@ export class World {
     this.camX = 0
     this.floorFrames = 0
     for (const [type, x] of this.floor.items) this.placeItem(type, x)
+    this.crates = this.floor.crates.map(([x, loot]) => new Crate(x, loot))
+    this.popups = []
     this.setPhase('intro')
   }
 
@@ -189,6 +202,10 @@ export class World {
     this.enemies = this.enemies.filter((g) => !g.removed)
     this.items = this.items.filter((i) => !i.removed)
     this.bullets = this.bullets.filter((b) => !b.removed)
+    this.crates = this.crates.filter((c) => !c.broken)
+    this.collectConsumables()
+    this.items = this.items.filter((i) => !i.removed)
+    this.popups = this.popups.filter((p) => this.realFrame - p.born < POPUP_FRAMES)
 
     if (this.mode === 'training') this.respawnTraining()
     if (this.director && !this.gameOver) this.runDirector()
@@ -292,7 +309,9 @@ export class World {
     let best: ItemEntity | null = null
     for (const e of this.items) {
       if (!e.pickable) continue
-      if (categoryOf(e.item) === 'ammo' && !(f.held && categoryOf(f.held) === 'firearm')) continue
+      const category = categoryOf(e.item)
+      if (category === 'consumable') continue
+      if (category === 'ammo' && !(f.held && categoryOf(f.held) === 'firearm')) continue
       const d = Math.abs(e.x - f.x)
       if (d <= PICKUP_REACH && (!best || d < Math.abs(best.x - f.x))) best = e
     }
@@ -391,7 +410,7 @@ export class World {
             : target.x === attacker.x ? attacker.facing : target.x > attacker.x ? 1 : -1
         const wasAlive = !target.life.isDead
         target.receiveHit(hit.spec, dir, this)
-        attacker.onHitLanded?.(target, this)
+        attacker.onHitLanded?.(this)
 
         this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : 4)
         if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
@@ -404,9 +423,45 @@ export class World {
           }
         }
         // 子彈、碎掉或已命中的投擲物不再打中同一幀的其他人
-        if ((attacker as { removed?: boolean }).removed || !attacker.activeHit()) break
+        if (spent(attacker)) break
+      }
+
+      // 只有特務這一方（拳腳、子彈、丟出的物件）打得破箱子
+      if (attacker.team !== 'agent' || hit.hitsAllies) continue
+      for (const crate of this.crates) {
+        if (spent(attacker)) break
+        if (crate.broken || hit.hitIds.has(crate.id) || !overlaps(hit.box, crate.box)) continue
+        hit.hitIds.add(crate.id)
+        crate.hit(this)
+        attacker.onHitLanded?.(this)
+        this.hitstop = Math.max(this.hitstop, 3)
       }
     }
+  }
+
+  // ── 自動撿起的道具 ──────────────────────────────────────────
+
+  /** 特務站在醫療箱或分數道具上就自動撿起並生效。 */
+  private collectConsumables(): void {
+    const agent = this.agent
+    if (agent.airborne || agent.life.isDead) return
+    for (const e of this.items) {
+      if (!e.pickable || categoryOf(e.item) !== 'consumable' || Math.abs(e.x - agent.x) > CONSUME_REACH) continue
+      // 滿血時醫療箱留在地上，需要時再回來拿
+      if (e.item.type === 'medkit' && agent.life.hp >= agent.life.max) continue
+      e.removed = true
+      if (e.item.type === 'medkit') {
+        agent.life.heal(e.item.uses)
+        this.popup(e.x, 'HEAL', '#7dff8a')
+      } else {
+        this.score += e.item.uses
+        this.popup(e.x, `+${e.item.uses}`, '#ffe36b')
+      }
+    }
+  }
+
+  private popup(x: number, text: string, color: string): void {
+    this.popups.push({ x, text, color, born: this.realFrame })
   }
 
   // ── 練習場 ──────────────────────────────────────────
@@ -440,6 +495,7 @@ export class World {
     }
     const camX = Math.round(this.camX)
     drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null)
+    for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)
     for (const g of this.enemies) g.draw(ctx, camX)
@@ -447,6 +503,17 @@ export class World {
     for (const i of this.items) if (i.state === 'flying') i.draw(ctx, camX)
     for (const b of this.bullets) b.draw(ctx, camX)
     this.particles.draw(ctx, camX)
+    ctx.font = '8px "Press Start 2P", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    for (const p of this.popups) {
+      const age = this.realFrame - p.born
+      const y = GROUND_Y - 30 - age * 0.5
+      ctx.fillStyle = '#000'
+      ctx.fillText(p.text, Math.round(p.x - camX) + 1, Math.round(y) + 1)
+      ctx.fillStyle = p.color
+      ctx.fillText(p.text, Math.round(p.x - camX), Math.round(y))
+    }
     if (this.debug) this.drawBoxes(ctx, camX)
     ctx.restore()
     drawHud(ctx, this)

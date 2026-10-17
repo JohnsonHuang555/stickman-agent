@@ -36,6 +36,8 @@ export interface FloorDef {
   /** 最終樓層：沒有樓梯，清完即通關。 */
   final?: boolean
   items: [ItemTypeId, number][]
+  /** 可打破的箱子：[x, 指定掉落物（省略則隨機）]。 */
+  crates: [number, ItemTypeId?][]
 }
 
 const L = 'left'
@@ -49,6 +51,7 @@ export const FLOORS: readonly FloorDef[] = [
     width: 1600,
     stairsX: 1550,
     items: [['chair', 330], ['bat', 560], ['chair', 900], ['cabinet', 1180]],
+    crates: [[450], [980], [1120, 'medkit']],
     zones: [
       {
         start: 160,
@@ -81,6 +84,7 @@ export const FLOORS: readonly FloorDef[] = [
     width: 1800,
     stairsX: 1750,
     items: [['chair', 300], ['knife', 520], ['chair', 820], ['shotgun', 1150], ['chair', 1420]],
+    crates: [[420], [1000], [1300, 'medkit']],
     zones: [
       {
         start: 200,
@@ -114,6 +118,7 @@ export const FLOORS: readonly FloorDef[] = [
     stairsX: 1350,
     final: true,
     items: [['cabinet', 280], ['chair', 600], ['pistol', 760], ['cabinet', 1000], ['chair', 1180]],
+    crates: [[400], [850, 'medkit'], [1060, 'medkit']],
     zones: [
       {
         start: 160,

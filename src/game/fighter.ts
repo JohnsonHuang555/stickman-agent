@@ -49,7 +49,7 @@ export abstract class Fighter implements Hitter {
   /** 當前動作是否為使用近戰武器（命中時扣耐久度）。 */
   protected abstract usingMeleeItem(): boolean
 
-  onHitLanded(_target: Fighter, world: World): void {
+  onHitLanded(world: World): void {
     const item = this.held
     if (!item || categoryOf(item) !== 'melee' || !this.usingMeleeItem()) return
     item.uses--

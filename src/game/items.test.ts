@@ -166,14 +166,14 @@ describe('throwing', () => {
   })
 
   it('a thrown cabinet keeps flying after a hit (pierces) while a chair shatters', () => {
-    const { world, agent, grunt } = setup([200])
+    const { world, agent } = setup([200])
     const cabinet = ItemEntity.thrown(newItem('cabinet'), agent)
-    cabinet.onHitLanded(grunt, world)
+    cabinet.onHitLanded(world)
     expect(cabinet.removed).toBe(false)
     expect(cabinet.activeHit()).not.toBeNull()
 
     const chair = ItemEntity.thrown(newItem('chair'), agent)
-    chair.onHitLanded(grunt, world)
+    chair.onHitLanded(world)
     expect(chair.removed).toBe(true)
   })
 

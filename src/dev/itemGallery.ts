@@ -1,6 +1,7 @@
 import { GROUND_Y } from '../game/constants'
 import { drawItemFlying, drawItemHeld, drawItemOnGround } from '../game/items/itemArt'
 import { ITEM_TYPES, type ItemTypeId } from '../game/items/itemTypes'
+import { Crate } from '../game/level/crate'
 import { drawLobby } from '../game/render/background'
 import { drawStickman, frontHand, type Pose } from '../game/stickman/pose'
 import { ATTACK_POSES, HOLD_ARMS, POSES } from '../game/stickman/poses'
@@ -11,7 +12,7 @@ export function drawItemGallery(ctx: CanvasRenderingContext2D): void {
   const types = Object.keys(ITEM_TYPES) as ItemTypeId[]
   const palette = { body: '#111111', back: '#4a4a4a' }
   types.forEach((type, i) => {
-    const x = 26 + i * 52
+    const x = 20 + i * 38
     const category = ITEM_TYPES[type].category
     const holdPose: Pose =
       category === 'throwable'
@@ -35,4 +36,8 @@ export function drawItemGallery(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = '#000'
     ctx.fillText(type, x, 30)
   })
+  new Crate(450).draw(ctx, 0)
+  const damaged = new Crate(420)
+  damaged.hp = 1
+  damaged.draw(ctx, 0)
 }

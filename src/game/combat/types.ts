@@ -51,7 +51,7 @@ export interface Hitter {
   vx: number
   facing: Facing
   activeHit(): ActiveHit | null
-  onHitLanded?(target: Fighter, world: World): void
+  onHitLanded?(world: World): void
 }
 
 export interface ActionDef {

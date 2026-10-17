@@ -19,6 +19,7 @@ const PICKUP_FRAMES = 12
 /** 會走去撿東西的最遠距離。 */
 const FETCH_RADIUS = 160
 const AMMO_DROP_CHANCE = 0.15
+const MEDKIT_DROP_CHANCE = 0.1
 
 /** 被擊飛的雜兵撞到同伴時造成的傷害。 */
 const BUMP: HitSpec = {
@@ -311,6 +312,9 @@ export class Grunt extends Enemy {
       world.dropHeld(this)
       if (this.life.isDead && this.type === 'gunman' && Math.random() < AMMO_DROP_CHANCE) {
         world.dropItem(newItem('ammo'), this.x, this.h)
+      }
+      if (this.life.isDead && Math.random() < MEDKIT_DROP_CHANCE) {
+        world.dropItem(newItem('medkit'), this.x, this.h)
       }
       this.setState('launched')
       this.bumpIds = new Set([this.id])

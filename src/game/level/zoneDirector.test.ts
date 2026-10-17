@@ -9,6 +9,7 @@ const floor: FloorDef = {
   width: 2000,
   stairsX: 1900,
   items: [],
+  crates: [],
   zones: [
     {
       start: 100,

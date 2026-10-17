@@ -113,7 +113,7 @@ export class ItemEntity implements Hitter {
     }
   }
 
-  onHitLanded(_target: Fighter, world: World): void {
+  onHitLanded(world: World): void {
     const t = this.throwSpec
     if (t.pierce) return
     if (t.breaks) {

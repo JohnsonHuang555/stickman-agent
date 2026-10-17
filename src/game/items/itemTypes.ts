@@ -1,4 +1,5 @@
-export type ItemCategory = 'melee' | 'firearm' | 'throwable' | 'ammo'
+/** consumable：走過去自動撿起並立即生效（醫療箱、分數道具）。 */
+export type ItemCategory = 'melee' | 'firearm' | 'throwable' | 'ammo' | 'consumable'
 
 export type ItemTypeId =
   | 'bat'
@@ -11,6 +12,9 @@ export type ItemTypeId =
   | 'cabinet'
   | 'desk'
   | 'ammo'
+  | 'medkit'
+  | 'cash'
+  | 'gold'
 
 /** 被丟出時的飛行與傷害。 */
 export interface ThrowSpec {
@@ -32,7 +36,7 @@ export interface ThrowSpec {
 export interface ItemTypeDef {
   label: string
   category: ItemCategory
-  /** 近戰武器：耐久度；槍械：滿彈數；投擲物：1；彈藥包：補充的子彈數。 */
+  /** 近戰武器：耐久度；槍械：滿彈數；投擲物：1；彈藥包：補充的子彈數；醫療箱：補血量；分數道具：分數。 */
   uses: number
   throw: ThrowSpec
   /** 持有時移動速度倍率，且無法跳躍（櫃子）。 */
@@ -87,6 +91,10 @@ export const ITEM_TYPES: Readonly<Record<ItemTypeId, ItemTypeDef>> = {
     throw: WEAPON_THROW,
     debris: '#6b7a3a',
   },
+  /** 補一條命條的 40%。 */
+  medkit: { label: 'MEDKIT', category: 'consumable', uses: 40, throw: WEAPON_THROW, debris: '#fff' },
+  cash: { label: 'CASH', category: 'consumable', uses: 500, throw: WEAPON_THROW, debris: '#4a8a3a' },
+  gold: { label: 'GOLD', category: 'consumable', uses: 1000, throw: WEAPON_THROW, debris: '#e8c33a' },
 }
 
 /** 一件具體的物件（含剩餘耐久度或子彈）。 */
