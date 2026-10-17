@@ -20,6 +20,12 @@ const PICKUP_FRAMES = 12
 const FETCH_RADIUS = 160
 const AMMO_DROP_CHANCE = 0.15
 const MEDKIT_DROP_CHANCE = 0.1
+/** 同一次浮空最多被打幾下，之後一定落地。 */
+export const JUGGLE_LIMIT = 5
+/** 浮空中被打中時往上彈的速度（直接重設，敵人才會停在特務附近的高度）。 */
+const JUGGLE_POP = 2.4
+const SPIKE_VELOCITY = -6
+const SPIKE_BOUNCE = 3.2
 
 /** 被擊飛的雜兵撞到同伴時造成的傷害。 */
 const BUMP: HitSpec = {
@@ -41,6 +47,7 @@ type GruntState =
   | 'pickup'
   | 'hurt'
   | 'launched'
+  | 'juggled'
   | 'down'
   | 'getup'
   | 'dying'
@@ -78,6 +85,10 @@ export class Grunt extends Enemy {
   private planned: PlannedMove | null = null
   private act: ActionInstance | null = null
   private bumpIds = new Set<number>()
+  /** 這次浮空已被命中的次數。 */
+  private juggleHits = 0
+  /** 被下砸中，著地時要反彈。 */
+  private spiked = false
   private target: ItemEntity | null = null
   /** 每個雜兵徘徊距離略有不同，避免疊在一起。 */
   private readonly hoverJitter = rand(-10, 25)
@@ -175,6 +186,7 @@ export class Grunt extends Enemy {
         if (this.stateFrame >= this.hitstun) this.setState('wait')
         break
       case 'launched':
+      case 'juggled':
         break
       case 'down':
         this.vx *= 0.7
@@ -189,9 +201,18 @@ export class Grunt extends Enemy {
         break
     }
 
-    if (this.applyPhysics(world) && this.state === 'launched') {
-      this.setState('down')
-      this.vx *= 0.4
+    if (this.applyPhysics(world)) {
+      if (this.spiked) {
+        // 被下砸踢砸到地上：反彈一次再倒地
+        this.spiked = false
+        this.vh = SPIKE_BOUNCE
+        this.vx *= 0.5
+        this.setState('launched')
+        world.quake(3)
+      } else if (this.state === 'launched' || this.state === 'juggled') {
+        this.setState('down')
+        this.vx *= 0.4
+      }
     }
   }
 
@@ -308,6 +329,9 @@ export class Grunt extends Enemy {
     this.act = null
     this.planned = null
     this.facing = (-dir) as Facing
+
+    if (!this.life.isDead && this.handleJuggle(spec, dir, world)) return
+
     if (spec.knockdown || this.life.isDead) {
       world.dropHeld(this)
       if (this.life.isDead && this.type === 'gunman' && Math.random() < AMMO_DROP_CHANCE) {
@@ -325,6 +349,44 @@ export class Grunt extends Enemy {
       this.hitstun = spec.hitstun
       this.vx = dir * spec.knockback
     }
+  }
+
+  /**
+   * 浮空相關的受擊：挑空技把人打上空中；浮空中再被打中就繼續停在空中（追擊），
+   * 直到達到浮空上限或被下砸。回傳是否已處理。
+   */
+  private handleJuggle(spec: HitSpec, dir: Facing, world: World): boolean {
+    const inAir = this.state === 'juggled'
+    if (!inAir) {
+      if (!spec.launch) return false
+      world.dropHeld(this)
+      this.setState('juggled')
+      this.juggleHits = 1
+      this.vh = spec.launch
+      this.vx = dir * 0.6
+      return true
+    }
+
+    this.juggleHits++
+    if (spec.spike) {
+      this.spiked = true
+      this.setState('launched')
+      this.vh = SPIKE_VELOCITY
+      this.vx = dir * 1
+    } else if (this.juggleHits >= JUGGLE_LIMIT) {
+      this.setState('launched')
+      this.vh = Math.max(this.vh, 2)
+      this.vx = dir * 1.5
+    } else {
+      this.vh = spec.launch ?? JUGGLE_POP
+      this.vx = dir * 0.3
+    }
+    return true
+  }
+
+  /** 正在空中被追擊。 */
+  get juggled(): boolean {
+    return this.state === 'juggled'
   }
 
   get label(): string {
@@ -361,6 +423,7 @@ export class Grunt extends Enemy {
       case 'hurt':
         return CLIPS.hurt.sample(0)
       case 'launched':
+      case 'juggled':
         return CLIPS.launched.sample(0)
       case 'down':
       case 'dying':

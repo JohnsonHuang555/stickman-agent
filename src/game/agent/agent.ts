@@ -25,11 +25,13 @@ const DOWN_FRAMES = 40
 const GETUP_FRAMES = 18
 const PICKUP_FRAMES = 10
 
-const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'diveSmash'])
+const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'diveSmash', 'airPunch'])
 const MOVE_FOR: Record<CommandKind, MoveId> = {
   punch: 'punch1',
   kick: 'kick',
   desperation: 'desperation',
+  launcher: 'launcher',
+  airPunch: 'airPunch1',
   flyingKick: 'flyingKick',
   diveSmash: 'diveSmash',
   dashPunch: 'dashPunch',
@@ -68,6 +70,8 @@ export class Agent extends Fighter {
       presses: buffer.presses,
       airborne: this.airborne,
       crouching: this.buttons.has('down') && !this.airborne,
+      up: this.buttons.has('up'),
+      down: this.buttons.has('down'),
     })
     if (cmd) this.buffered = { cmd, until: realFrame + COMMAND_BUFFER }
     if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
@@ -87,7 +91,7 @@ export class Agent extends Fighter {
         this.updateFree(cmd, now, world)
         break
       case 'action':
-        this.updateAction(cmd, world)
+        this.updateAction(cmd, now, world)
         break
       case 'land':
         if (this.stateFrame >= LAND_FRAMES) this.setState('free')
@@ -139,11 +143,7 @@ export class Agent extends Fighter {
     const dir = this.heldDir()
     if (this.jumpUntil >= now && !this.carryingHeavy) {
       this.jumpUntil = -1
-      if (dir) this.facing = dir
-      this.vx = dir * AIR_DRIFT
-      this.vh = JUMP_VELOCITY
-      this.crouching = false
-      this.walking = false
+      this.startJump(dir)
       return
     }
 
@@ -153,12 +153,22 @@ export class Agent extends Fighter {
     if (dir) this.facing = dir
   }
 
-  private updateAction(cmd: Command | null, world: World): void {
+  private updateAction(cmd: Command | null, now: number, world: World): void {
     const act = this.act!
     act.frame++
     act.def.tick?.(this, act.frame, world)
 
-    if (cmd?.kind === 'punch' && act.def.chain && act.frame >= act.def.chain.accept) {
+    // 挑空技收招時按跳：直接起跳追擊
+    if (act.def.jumpCancel !== undefined && act.frame >= act.def.jumpCancel && this.jumpUntil >= now && !this.airborne) {
+      this.jumpUntil = -1
+      this.act = null
+      this.setState('free')
+      this.startJump(this.heldDir())
+      return
+    }
+
+    const chain = act.def.chain
+    if (chain && cmd?.kind === (chain.on ?? 'punch') && act.frame >= chain.accept) {
       act.chainQueued = true
       this.buffered = null
     } else if (cmd?.kind === 'desperation' && act.def.cancelToDesperation && act.frame <= SIMULTANEOUS_WINDOW + 1) {
@@ -200,6 +210,14 @@ export class Agent extends Fighter {
     this.buffered = null
     this.startAction(MOVES[MOVE_FOR[cmd.kind]])
     return true
+  }
+
+  private startJump(dir: -1 | 0 | 1): void {
+    if (dir) this.facing = dir
+    this.vx = dir * AIR_DRIFT
+    this.vh = JUMP_VELOCITY
+    this.crouching = false
+    this.walking = false
   }
 
   private startAction(def: ActionDef): void {

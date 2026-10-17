@@ -10,6 +10,15 @@ const punchStep = (f: Fighter, frame: number) => {
   f.vx = frame >= 1 && frame <= 3 ? f.facing * 1 : 0
 }
 
+/** 空中出招時幾乎停在半空，讓空中連段接得起來。 */
+const airHang = (f: Fighter) => {
+  f.vh = Math.max(f.vh, -0.4)
+  f.vx *= 0.85
+}
+
+/** 挑空技把雜兵打上空中的初速。 */
+export const LAUNCH_VELOCITY = 7.6
+
 // 判定距離（身體中心到前緣）：拳約 26px、踢約 34px；起手幀數比初版短約 20%
 export const MOVES = {
   punch1: {
@@ -49,6 +58,50 @@ export const MOVES = {
     // 出腿時往前小跨一步
     tick: (f, frame) => {
       f.vx = frame >= 4 && frame <= 9 ? f.facing * 1.4 : 0
+    },
+  },
+  /** ↑+Z：上勾拳把雜兵打上空中；收招時可按跳取消，跳起來追擊。 */
+  launcher: {
+    clip: attackClip(ATTACK_POSES.punch3, 4, 6, 12),
+    length: 22,
+    hit: { from: 4, to: 7, box: { forward: 2, up: 10, w: 26, h: 36 }, damage: 8, hitstun: 24, knockback: 0.6, launch: LAUNCH_VELOCITY },
+    jumpCancel: 7,
+    tick: punchStep,
+  },
+  /** 空中連段：Z → Z → X。 */
+  airPunch1: {
+    clip: attackClip(ATTACK_POSES.airPunch1, 2, 3, 5, POSES.jumpFall),
+    length: 10,
+    aerial: true,
+    hit: { from: 2, to: 4, box: { forward: 2, up: 16, w: 26, h: 22 }, damage: 5, hitstun: 18, knockback: 0.6 },
+    chain: { accept: 2, at: 6, next: 'airPunch2', on: 'airPunch' },
+    tick: airHang,
+  },
+  airPunch2: {
+    clip: attackClip(ATTACK_POSES.airPunch2, 2, 3, 6, POSES.jumpFall),
+    length: 11,
+    aerial: true,
+    hit: { from: 2, to: 4, box: { forward: 2, up: 16, w: 26, h: 22 }, damage: 6, hitstun: 18, knockback: 0.6 },
+    chain: { accept: 2, at: 6, next: 'airSpike', on: 'flyingKick' },
+    tick: airHang,
+  },
+  airSpike: {
+    clip: attackClip(ATTACK_POSES.airSpike, 3, 5, 8, POSES.jumpFall),
+    length: 16,
+    aerial: true,
+    hit: {
+      from: 3,
+      to: 7,
+      box: { forward: -2, up: -6, w: 32, h: 42 },
+      damage: 10,
+      hitstun: 24,
+      knockback: 1.5,
+      knockdown: true,
+      heavy: true,
+      spike: true,
+    },
+    tick: (f, frame) => {
+      if (frame < 3) airHang(f)
     },
   },
   flyingKick: {

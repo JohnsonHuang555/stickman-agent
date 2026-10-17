@@ -6,6 +6,8 @@ export type CommandKind =
   | 'punch'
   | 'kick'
   | 'desperation'
+  | 'launcher'
+  | 'airPunch'
   | 'flyingKick'
   | 'diveSmash'
   | 'dashPunch'
@@ -27,6 +29,10 @@ export interface CommandContext {
   presses: readonly Press[]
   airborne: boolean
   crouching: boolean
+  /** 正按著 ↑（挑空技）。 */
+  up?: boolean
+  /** 正按著 ↓（空中下砸拳）。 */
+  down?: boolean
 }
 
 /** 依本幀按下的攻擊鍵與最近的按鍵紀錄，判定要出什麼招。 */
@@ -36,7 +42,11 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   const kick = pressedNow('kick')
   if (!punch && !kick) return null
 
-  if (ctx.airborne) return { kind: kick ? 'flyingKick' : 'diveSmash' }
+  // 空中：X 飛踢；Z 空中拳（可接成空中連段）；↓+Z 下砸拳
+  if (ctx.airborne) {
+    if (kick) return { kind: 'flyingKick' }
+    return { kind: ctx.down ? 'diveSmash' : 'airPunch' }
+  }
 
   const other: Button = punch ? 'kick' : 'punch'
   const otherRecently = ctx.presses.some(
@@ -45,6 +55,7 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   if (otherRecently) return { kind: 'desperation' }
 
   if (kick) return { kind: 'kick' }
+  if (ctx.up) return { kind: 'launcher' }
   if (ctx.crouching) return { kind: 'sweep' }
 
   const dir = doubleTapDirection(ctx.presses, ctx.frame)

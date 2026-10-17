@@ -32,6 +32,10 @@ export interface HitSpec {
   knockdown?: boolean
   /** 重擊：頓幀較長並震動畫面。 */
   heavy?: boolean
+  /** 挑空：把雜兵打上空中的初速（Boss 不受影響）。 */
+  launch?: number
+  /** 下砸：把空中的雜兵往下打，著地時反彈。 */
+  spike?: boolean
 }
 
 /** 這一幀正在生效的攻擊判定。 */
@@ -60,8 +64,10 @@ export interface ActionDef {
   length: number
   hit?: HitSpec
   aerial?: boolean
-  /** 連擊：accept 幀起接受下一拳輸入，at 幀起才接下一段。 */
-  chain?: { accept: number; at: number; next: string }
+  /** 連擊：accept 幀起接受輸入 on（預設為出拳），at 幀起才接下一段 next。 */
+  chain?: { accept: number; at: number; next: string; on?: string }
+  /** 從這一幀起按跳可以取消收招直接起跳（挑空技接追擊用）。 */
+  jumpCancel?: number
   /** 起手幾幀內可被 z+x 取消成保命招。 */
   cancelToDesperation?: boolean
   invuln?: boolean

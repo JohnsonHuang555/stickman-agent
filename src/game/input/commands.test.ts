@@ -4,12 +4,18 @@ import { DOUBLE_TAP_WINDOW, SIMULTANEOUS_WINDOW, recognizeCommand } from './comm
 
 const press = (button: Button, frame: number): Press => ({ button, frame })
 
-function recognize(presses: Press[], frame: number, opts: { airborne?: boolean; crouching?: boolean } = {}) {
+function recognize(
+  presses: Press[],
+  frame: number,
+  opts: { airborne?: boolean; crouching?: boolean; up?: boolean; down?: boolean } = {},
+) {
   return recognizeCommand({
     frame,
     presses,
     airborne: opts.airborne ?? false,
     crouching: opts.crouching ?? false,
+    up: opts.up,
+    down: opts.down,
   })
 }
 
@@ -38,9 +44,18 @@ describe('recognizeCommand', () => {
     expect(recognize(presses, 11 + SIMULTANEOUS_WINDOW)?.kind).toBe('kick')
   })
 
-  it('in the air, x is a flying kick and z is a dive smash', () => {
+  it('in the air, x is a flying kick, z is an air punch, and down+z is a dive smash', () => {
     expect(recognize([press('kick', 10)], 10, { airborne: true })?.kind).toBe('flyingKick')
-    expect(recognize([press('punch', 10)], 10, { airborne: true })?.kind).toBe('diveSmash')
+    expect(recognize([press('punch', 10)], 10, { airborne: true })?.kind).toBe('airPunch')
+    expect(recognize([press('punch', 10)], 10, { airborne: true, down: true })?.kind).toBe('diveSmash')
+  })
+
+  it('up + z on the ground is the launcher', () => {
+    expect(recognize([press('punch', 10)], 10, { up: true })?.kind).toBe('launcher')
+  })
+
+  it('up + z + x is still the desperation move', () => {
+    expect(recognize([press('punch', 10), press('kick', 10)], 10, { up: true })?.kind).toBe('desperation')
   })
 
   it('no desperation move in the air', () => {

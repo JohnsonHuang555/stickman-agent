@@ -48,6 +48,11 @@ function drawClear(ctx: CanvasRenderingContext2D, world: World): void {
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
+  // 淡色背景上白字不好讀：在上方資訊與下方操作說明後面墊一條半透明深色底
+  ctx.fillStyle = 'rgba(20,16,24,0.45)'
+  ctx.fillRect(0, 0, VIEW_W, world.agent.held ? 40 : 32)
+  ctx.fillRect(0, VIEW_H - 12, VIEW_W, 12)
+
   text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, 8, 8)
   text(ctx, 'AGENT', 8, 20, 6)
   drawLifeBar(ctx, 44, 20, 110, 6, world.agent.life)
@@ -115,8 +120,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'
-  ctx.fillText('←→ 移動  ↓ 蹲  Z 拳/用  X 踢  空白 跳  C 撿/丟  Z+X 保命招  →→Z 衝刺拳  P 暫停  ` 判定框', VIEW_W / 2, VIEW_H - 3)
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  ↑Z 挑空→跳起 Z Z X  ↓空中Z 下砸  Z+X 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
 
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
