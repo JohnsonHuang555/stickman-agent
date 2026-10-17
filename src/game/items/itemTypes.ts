@@ -1,6 +1,16 @@
 export type ItemCategory = 'melee' | 'firearm' | 'throwable' | 'ammo'
 
-export type ItemTypeId = 'bat' | 'crowbar' | 'knife' | 'katana' | 'pistol' | 'shotgun' | 'chair' | 'cabinet' | 'ammo'
+export type ItemTypeId =
+  | 'bat'
+  | 'crowbar'
+  | 'knife'
+  | 'katana'
+  | 'pistol'
+  | 'shotgun'
+  | 'chair'
+  | 'cabinet'
+  | 'desk'
+  | 'ammo'
 
 /** 被丟出時的飛行與傷害。 */
 export interface ThrowSpec {
@@ -60,6 +70,15 @@ export const ITEM_TYPES: Readonly<Record<ItemTypeId, ItemTypeDef>> = {
     heavy: true,
     throw: { vx: 3.2, vh: 2.2, straight: 0, damage: 22, knockdown: true, pierce: true, breaks: true, w: 18, h: 22 },
     debris: '#7d8590',
+  },
+  /** 只有魔王 Johnson 會丟。 */
+  desk: {
+    label: 'DESK',
+    category: 'throwable',
+    uses: 1,
+    heavy: true,
+    throw: { vx: 4, vh: 2.6, straight: 0, damage: 26, knockdown: true, pierce: true, breaks: true, w: 30, h: 18 },
+    debris: '#5a3a1e',
   },
   ammo: {
     label: 'AMMO',

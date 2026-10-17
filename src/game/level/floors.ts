@@ -1,14 +1,22 @@
+import type { BossId } from '../enemies/bosses'
 import type { EnemyType } from '../enemies/enemyTypes'
 import type { ItemTypeId } from '../items/itemTypes'
 
 export type Theme = 'lobby' | 'casino' | 'office'
 
-export interface Spawn {
+export interface GruntSpawn {
   type: EnemyType
   side: 'left' | 'right'
   /** 覆寫登場時的持有物；null 表示空手，省略則用敵人類型的預設。 */
   held?: ItemTypeId | null
 }
+
+export interface BossSpawn {
+  boss: BossId
+  side: 'left' | 'right'
+}
+
+export type Spawn = GruntSpawn | BossSpawn
 
 export interface ZoneDef {
   /** 鏡頭鎖定時畫面左緣的地板座標。特務走到畫面中央（start + 240）時觸發。 */
@@ -25,13 +33,14 @@ export interface FloorDef {
   zones: ZoneDef[]
   /** 樓梯所在的地板座標；清完所有區段後走到這裡就上樓。 */
   stairsX: number
+  /** 最終樓層：沒有樓梯，清完即通關。 */
+  final?: boolean
   items: [ItemTypeId, number][]
 }
 
 const L = 'left'
 const R = 'right'
 
-// 每層最後一個區段之後會由小 Boss／魔王接手（下一個里程碑）。
 export const FLOORS: readonly FloorDef[] = [
   {
     label: '1F',
@@ -60,6 +69,7 @@ export const FLOORS: readonly FloorDef[] = [
         waves: [
           [{ type: 'gunman', side: R }, { type: 'thug', side: R }],
           [{ type: 'heavy', side: R }, { type: 'bruiser', side: L, held: 'crowbar' }, { type: 'thug', side: L }],
+          [{ boss: 'kane', side: R }, { type: 'thug', side: L }],
         ],
       },
     ],
@@ -91,6 +101,7 @@ export const FLOORS: readonly FloorDef[] = [
         waves: [
           [{ type: 'bruiser', side: R, held: 'katana' }, { type: 'knifer', side: R }, { type: 'thug', side: L }],
           [{ type: 'heavy', side: L }, { type: 'gunman', side: R }, { type: 'knifer', side: R }],
+          [{ boss: 'ryu', side: R }],
         ],
       },
     ],
@@ -101,7 +112,8 @@ export const FLOORS: readonly FloorDef[] = [
     theme: 'office',
     width: 1400,
     stairsX: 1350,
-    items: [['cabinet', 280], ['chair', 600], ['pistol', 760], ['cabinet', 1000]],
+    final: true,
+    items: [['cabinet', 280], ['chair', 600], ['pistol', 760], ['cabinet', 1000], ['chair', 1180]],
     zones: [
       {
         start: 160,
@@ -116,6 +128,10 @@ export const FLOORS: readonly FloorDef[] = [
           [{ type: 'knifer', side: R }, { type: 'knifer', side: L }, { type: 'gunman', side: R }],
           [{ type: 'bruiser', side: L, held: 'katana' }, { type: 'gunman', side: R }, { type: 'heavy', side: R }],
         ],
+      },
+      {
+        start: 920,
+        waves: [[{ boss: 'johnson', side: R }]],
       },
     ],
   },

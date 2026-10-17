@@ -4,7 +4,7 @@ import type { Facing } from './input/commands'
 import { drawItemHeld } from './items/itemArt'
 import { ITEM_TYPES, categoryOf, type Item } from './items/itemTypes'
 import type { LifePool } from './life/lifePool'
-import { drawStickman, frontHand, type Palette, type Pose } from './stickman/pose'
+import { backHand, drawStickman, frontHand, type Palette, type Pose } from './stickman/pose'
 import { HOLD_ARMS } from './stickman/poses'
 import type { World } from './world'
 
@@ -26,6 +26,8 @@ export abstract class Fighter implements Hitter {
   flash = 0
   /** 同時只能持有一件。 */
   held: Item | null = null
+  /** 只用於外觀：後手拿的東西（雙刀劍客）。 */
+  heldBack: Item | null = null
   readonly scale: number = 1
   abstract readonly team: Team
   abstract readonly palette: Palette
@@ -113,8 +115,14 @@ export abstract class Fighter implements Hitter {
     ctx.fill()
     ctx.globalAlpha = this.alpha
     const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
-    drawStickman(ctx, pose, x, GROUND_Y - this.h, this.facing, palette, this.scale)
-    if (this.held) drawItemHeld(ctx, this.held.type, frontHand(pose, x, GROUND_Y - this.h, this.facing, this.scale))
+    const footY = GROUND_Y - this.h
+    if (this.heldBack) drawItemHeld(ctx, this.heldBack.type, backHand(pose, x, footY, this.facing, this.scale))
+    drawStickman(ctx, pose, x, footY, this.facing, palette, this.scale)
+    this.drawCostume(ctx, pose, x, footY)
+    if (this.held) drawItemHeld(ctx, this.held.type, frontHand(pose, x, footY, this.facing, this.scale))
     ctx.globalAlpha = 1
   }
+
+  /** 角色專屬裝扮（帽子、墨鏡等），畫在火柴人之上。 */
+  protected drawCostume(_ctx: CanvasRenderingContext2D, _pose: Pose, _x: number, _footY: number): void {}
 }

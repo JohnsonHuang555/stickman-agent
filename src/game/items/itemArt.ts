@@ -1,7 +1,7 @@
 import { GROUND_Y } from '../constants'
 import type { ItemTypeId } from './itemTypes'
 
-const BLOCKS: ReadonlySet<ItemTypeId> = new Set(['chair', 'cabinet', 'ammo'])
+const BLOCKS: ReadonlySet<ItemTypeId> = new Set(['chair', 'cabinet', 'desk', 'ammo'])
 /** 長條物件的長度，用來在地上置中擺放。 */
 const LENGTH: Partial<Record<ItemTypeId, number>> = { bat: 21, crowbar: 20, knife: 11, katana: 32, pistol: 9, shotgun: 24 }
 
@@ -70,6 +70,16 @@ function drawBlock(ctx: CanvasRenderingContext2D, type: ItemTypeId): void {
       ctx.fillRect(-2, -9, 4, 1)
       ctx.fillRect(-2, -1, 4, 1)
       ctx.fillRect(-2, 7, 4, 1)
+      break
+    case 'desk':
+      ctx.fillStyle = '#5a3a1e'
+      ctx.fillRect(-15, -7, 30, 4)
+      ctx.fillRect(-14, -3, 3, 10)
+      ctx.fillRect(11, -3, 3, 10)
+      ctx.fillStyle = '#7a5230'
+      ctx.fillRect(-9, -3, 12, 7)
+      ctx.fillStyle = '#c9a227'
+      ctx.fillRect(-4, 0, 2, 1)
       break
     case 'ammo':
       ctx.fillStyle = '#6b7a3a'

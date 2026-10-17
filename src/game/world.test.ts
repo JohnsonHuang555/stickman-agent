@@ -9,7 +9,7 @@ function arena(gap = 14) {
   const world = new World({ mode: 'sandbox' })
   world.agent.x = 300
   const grunt = new Grunt(300 + gap, 'heavy', { passive: true })
-  world.grunts = [grunt]
+  world.enemies = [grunt]
   return { world, grunt }
 }
 
@@ -24,7 +24,7 @@ function run(world: World, frames: number, held: Button[] = []) {
 describe('World simulation', () => {
   it('holding right walks the agent right', () => {
     const { world } = arena()
-    world.grunts = []
+    world.enemies = []
     run(world, 30, ['right'])
     expect(world.agent.x).toBeGreaterThan(330)
   })
@@ -50,7 +50,7 @@ describe('World simulation', () => {
   it('the full combo connects on a normal-sized grunt (knockback does not push it out of range)', () => {
     const { world } = arena()
     const thug = new Grunt(314, 'thug', { passive: true })
-    world.grunts = [thug]
+    world.enemies = [thug]
     for (let i = 0; i < 6; i++) {
       tick(world, ['punch'])
       run(world, 7)
@@ -79,7 +79,7 @@ describe('World simulation', () => {
 
   it('jumping leaves the ground and lands again', () => {
     const { world } = arena()
-    world.grunts = []
+    world.enemies = []
     tick(world, ['jump'])
     run(world, 5)
     expect(world.agent.h).toBeGreaterThan(0)
@@ -117,7 +117,7 @@ describe('World simulation', () => {
   it('a knocked-down grunt flying into another one hurts it', () => {
     const { world, grunt } = arena(14)
     const behind = new Grunt(350, 'heavy', { passive: true })
-    world.grunts.push(behind)
+    world.enemies.push(behind)
     for (let i = 0; i < 6; i++) {
       tick(world, ['punch'])
       run(world, 7)
@@ -132,7 +132,7 @@ describe('Grunt AI', () => {
   function brawl(types: EnemyType[]) {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 400
-    world.grunts = types.map((t, i) => new Grunt(250 + i * 60 + (i % 2 ? 250 : 0), t))
+    world.enemies = types.map((t, i) => new Grunt(250 + i * 60 + (i % 2 ? 250 : 0), t))
     return world
   }
 
@@ -174,7 +174,7 @@ describe('Grunt AI', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const heavy = new Grunt(318, 'heavy', { moves: ['slam'] })
-    world.grunts = [heavy]
+    world.enemies = [heavy]
     for (let i = 0; i < 600 && !heavy.attacking; i++) tick(world)
     expect(heavy.attacking).toBe(true)
 
@@ -192,7 +192,7 @@ describe('Grunt AI', () => {
   it('crouching ducks under a jab', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
-    world.grunts = [new Grunt(318, 'thug', { moves: ['jab'] })]
+    world.enemies = [new Grunt(318, 'thug', { moves: ['jab'] })]
     run(world, 400, ['down'])
     expect(world.agent.life.hp).toBe(world.agent.life.max)
   })
@@ -200,7 +200,7 @@ describe('Grunt AI', () => {
   it('a kick still hits a crouching agent', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
-    world.grunts = [new Grunt(320, 'thug', { moves: ['kick'] })]
+    world.enemies = [new Grunt(320, 'thug', { moves: ['kick'] })]
     run(world, 400, ['down'])
     expect(world.agent.life.hp).toBeLessThan(world.agent.life.max)
   })

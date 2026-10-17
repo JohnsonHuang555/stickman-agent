@@ -9,7 +9,7 @@ function setup(gaps: number[] = [14]) {
   const world = new World({ mode: 'sandbox' })
   world.agent.x = 300
   const grunts = gaps.map((g) => new Grunt(300 + g, 'heavy', { passive: true, held: null }))
-  world.grunts = grunts
+  world.enemies = grunts
   return { world, agent: world.agent, grunts, grunt: grunts[0] }
 }
 
@@ -201,7 +201,7 @@ describe('dropping', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     world.agent.held = newItem('bat')
-    world.grunts = [new Grunt(318, 'heavy', { moves: ['slam'], held: null })]
+    world.enemies = [new Grunt(318, 'heavy', { moves: ['slam'], held: null })]
     for (let i = 0; i < 600 && world.agent.held; i++) tick(world)
     expect(world.agent.held).toBeNull()
     expect(world.items.some((i) => i.item.type === 'bat')).toBe(true)
@@ -211,7 +211,7 @@ describe('dropping', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const grunt = new Grunt(314, 'bruiser', { passive: true, held: newItem('crowbar') })
-    world.grunts = [grunt]
+    world.enemies = [grunt]
     for (let i = 0; i < 6; i++) {
       tick(world, ['punch'])
       run(world, 7)
@@ -226,7 +226,7 @@ describe('armed enemies', () => {
   it('a gunman shoots a standing agent from range', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
-    world.grunts = [new Grunt(450, 'gunman', { held: newItem('pistol', 8) })]
+    world.enemies = [new Grunt(450, 'gunman', { held: newItem('pistol', 8) })]
     run(world, 400)
     expect(world.agent.life.hp).toBeLessThan(world.agent.life.max)
   })
@@ -235,7 +235,7 @@ describe('armed enemies', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const gunman = new Grunt(450, 'gunman', { held: newItem('pistol', 8) })
-    world.grunts = [gunman]
+    world.enemies = [gunman]
     run(world, 300, ['down'])
     expect(gunman.held?.uses).toBeLessThan(8)
     expect(world.agent.life.hp).toBe(world.agent.life.max)
@@ -245,7 +245,7 @@ describe('armed enemies', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 100
     const bruiser = new Grunt(300, 'bruiser', { held: null })
-    world.grunts = [bruiser]
+    world.enemies = [bruiser]
     world.placeItem('bat', 380)
     for (let i = 0; i < 400 && !bruiser.held; i++) tick(world)
     expect(bruiser.held?.type).toBe('bat')
@@ -255,7 +255,7 @@ describe('armed enemies', () => {
     const world = new World({ mode: 'sandbox' })
     world.agent.x = 150
     const heavy = new Grunt(300, 'heavy', { held: null, moves: ['jab'] })
-    world.grunts = [heavy]
+    world.enemies = [heavy]
     world.placeItem('chair', 330)
     let picked = false
     for (let i = 0; i < 900; i++) {

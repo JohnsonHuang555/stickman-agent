@@ -2,7 +2,9 @@ import { Agent } from './agent/agent'
 import { overlaps, type HitSpec, type Hitter } from './combat/types'
 import { GROUND_Y, VIEW_W } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
-import { ENEMY_TYPES, ENEMY_TYPE_IDS } from './enemies/enemyTypes'
+import { Boss } from './enemies/boss'
+import { Enemy } from './enemies/enemy'
+import { ENEMY_TYPE_IDS } from './enemies/enemyTypes'
 import { Grunt } from './enemies/grunt'
 import type { Fighter } from './fighter'
 import { InputBuffer, type InputSnapshot } from './input/buttons'
@@ -22,6 +24,9 @@ const SEPARATION = 14
 /** 撿東西的距離。 */
 const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
+const BOSS_BANNER_FRAMES = 150
+/** 魔王倒下到顯示 MISSION COMPLETE 的幀數。 */
+const MISSION_CLEAR_DELAY = 150
 const CLEAR_FRAMES = 200
 /** 過層獎勵：每點血量的分數，以及用時獎勵的上限與每秒扣分。 */
 const LIFE_BONUS_PER_HP = 20
@@ -63,7 +68,7 @@ export class World {
   floorWidth = 1440
   readonly agent = new Agent(80)
   readonly slots = new AttackSlots(2)
-  grunts: Grunt[] = []
+  enemies: Enemy[] = []
   items: ItemEntity[] = []
   bullets: Bullet[] = []
 
@@ -76,7 +81,10 @@ export class World {
   /** Game Over 或通關後玩家按鍵要求重來；由 main 建立新的 World。 */
   restartRequested = false
   /** HUD 右側顯示的敵人（最近被打的那個）。 */
-  focus: { target: Grunt; until: number } | null = null
+  focus: { target: Enemy; until: number } | null = null
+  /** Boss 出場時的警告字幕。 */
+  bossBanner: { boss: Boss; until: number } | null = null
+  private missionClearIn: number | null = null
 
   floorIndex = 0
   floor: FloorDef | null = null
@@ -99,7 +107,7 @@ export class World {
     if (this.mode === 'campaign') {
       this.loadFloor(options.startFloor ?? 0)
     } else if (this.mode === 'training') {
-      this.grunts.push(new Grunt(260, 'thug'), new Grunt(330, 'bruiser'))
+      this.enemies.push(new Grunt(260, 'thug'), new Grunt(330, 'bruiser'))
       const layout: [ItemTypeId, number][] = [
         ['chair', 160], ['knife', 420], ['cabinet', 600], ['katana', 820], ['shotgun', 1050], ['chair', 1250],
       ]
@@ -117,7 +125,7 @@ export class World {
     this.floor = FLOORS[index]
     this.floorWidth = this.floor.width
     this.director = new ZoneDirector(this.floor)
-    this.grunts = []
+    this.enemies = []
     this.items = []
     this.bullets = []
     this.focus = null
@@ -170,15 +178,15 @@ export class World {
     this.floorFrames++
 
     this.agent.update(this)
-    for (const g of this.grunts) g.update(this)
+    for (const g of this.enemies) g.update(this)
     for (const i of this.items) i.update(this)
     for (const b of this.bullets) b.update(this)
     this.particles.update()
     this.separateGrunts()
     this.resolveHits()
 
-    for (const g of this.grunts) if (!g.wantsSlot) this.slots.release(g.id)
-    this.grunts = this.grunts.filter((g) => !g.removed)
+    for (const g of this.enemies) if (!g.wantsSlot) this.slots.release(g.id)
+    this.enemies = this.enemies.filter((g) => !g.removed)
     this.items = this.items.filter((i) => !i.removed)
     this.bullets = this.bullets.filter((b) => !b.removed)
 
@@ -198,8 +206,19 @@ export class World {
 
   private runDirector(): void {
     const director = this.director!
-    const alive = this.grunts.filter((g) => !g.isGone).length
+    const alive = this.enemies.filter((g) => !g.isGone).length
     for (const spawn of director.update(this.realFrame, this.agent.x, alive)) this.spawn(spawn)
+
+    // 最終樓層：魔王倒下時手下一起倒下，演出結束後通關
+    if (this.floor!.final) {
+      const boss = this.boss
+      if (boss?.life.isDead) for (const e of this.enemies) e.defeat()
+      if (director.allCleared) {
+        this.missionClearIn ??= MISSION_CLEAR_DELAY
+        if (--this.missionClearIn <= 0) this.setPhase('complete')
+      }
+      return
+    }
 
     if (director.allCleared && this.agent.x >= this.floor!.stairsX - 6 && !this.agent.airborne) {
       const seconds = Math.floor(this.floorFrames / 60)
@@ -212,11 +231,23 @@ export class World {
     }
   }
 
-  private spawn(spawn: Spawn): void {
+  /** 從目前畫面（或鎖定區段）的左右邊緣外出場。 */
+  spawn(spawn: Spawn): void {
     const left = this.director?.lockLeft ?? this.camX
-    const x = spawn.side === 'left' ? left - 16 : left + VIEW_W + 16
+    const x = Math.min(this.floorWidth - 8, Math.max(8, spawn.side === 'left' ? left - 16 : left + VIEW_W + 16))
+    if ('boss' in spawn) {
+      const boss = new Boss(x, spawn.boss)
+      this.enemies.push(boss)
+      this.bossBanner = { boss, until: this.realFrame + BOSS_BANNER_FRAMES }
+      return
+    }
     const held = spawn.held === undefined ? undefined : spawn.held === null ? null : newItem(spawn.held)
-    this.grunts.push(new Grunt(Math.min(this.floorWidth - 8, Math.max(8, x)), spawn.type, { held }))
+    this.enemies.push(new Grunt(x, spawn.type, { held }))
+  }
+
+  /** 場上的 Boss（含正在倒下的）。 */
+  get boss(): Boss | null {
+    return (this.enemies.find((e) => e instanceof Boss) as Boss | undefined) ?? null
   }
 
   /** 鎖鏡頭時，特務不能離開畫面；已經走進畫面的雜兵也不能再出去。 */
@@ -225,7 +256,7 @@ export class World {
     if (left === null || left === undefined) return
     const right = left + VIEW_W
     this.agent.x = Math.min(right - 8, Math.max(left + 8, this.agent.x))
-    for (const g of this.grunts) {
+    for (const g of this.enemies) {
       if (g.x > left + 8 && g.x < right - 8) g.entered = true
       if (g.entered) g.x = Math.min(right - 8, Math.max(left + 8, g.x))
     }
@@ -302,19 +333,30 @@ export class World {
     }
   }
 
+  /** 從手上往面對的方向開一槍，子彈高度指定（魔王連射用）。 */
+  shoot(f: Fighter, height: number): void {
+    const hand = f.handPosition()
+    this.bullets.push(new Bullet(hand.x + f.facing * 6, height, f.facing * 6, 0, f.team, PISTOL_BULLET, 360, new Set([f.id])))
+    this.shake = Math.max(this.shake, 1.5)
+  }
+
   burst(x: number, y: number, color: string): void {
     this.particles.burst(x, y, color)
+  }
+
+  quake(amount: number): void {
+    this.shake = Math.max(this.shake, amount)
   }
 
   // ── 戰鬥 ──────────────────────────────────────────
 
   private get fighters(): Fighter[] {
-    return [this.agent, ...this.grunts]
+    return [this.agent, ...this.enemies]
   }
 
   /** 站在地上的雜兵彼此稍微推開，避免疊成一團。 */
   private separateGrunts(): void {
-    const standing = this.grunts.filter((g) => !g.airborne && g.hurtbox())
+    const standing = this.enemies.filter((g) => !g.airborne && g.hurtbox())
     for (let i = 0; i < standing.length; i++) {
       for (let j = i + 1; j < standing.length; j++) {
         const a = standing[i]
@@ -354,11 +396,11 @@ export class World {
         this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : 4)
         if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
 
-        if (target instanceof Grunt) {
+        if (target instanceof Enemy) {
           this.focus = { target, until: this.realFrame + 180 }
           if (attacker.team === 'agent' || hit.hitsAllies) {
             this.score += 10
-            if (wasAlive && target.life.isDead) this.score += ENEMY_TYPES[target.type].score
+            if (wasAlive && target.life.isDead) this.score += target.score
           }
         }
         // 子彈、碎掉或已命中的投擲物不再打中同一幀的其他人
@@ -370,7 +412,7 @@ export class World {
   // ── 練習場 ──────────────────────────────────────────
 
   private respawnTraining(): void {
-    const alive = this.grunts.filter((g) => !g.isGone).length
+    const alive = this.enemies.filter((g) => !g.isGone).length
     if (alive >= TRAINING_GRUNTS) {
       this.respawnAt = this.realFrame + 90
     } else if (this.realFrame >= this.respawnAt) {
@@ -397,10 +439,10 @@ export class World {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
     const camX = Math.round(this.camX)
-    drawBackground(ctx, this.theme, camX, this.floor?.stairsX ?? null)
+    drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)
-    for (const g of this.grunts) g.draw(ctx, camX)
+    for (const g of this.enemies) g.draw(ctx, camX)
     this.agent.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'flying') i.draw(ctx, camX)
     for (const b of this.bullets) b.draw(ctx, camX)

@@ -1,5 +1,4 @@
 import type { ActionDef, ActionInstance, ActiveHit, Box, HitSpec } from '../combat/types'
-import { Fighter } from '../fighter'
 import type { Facing } from '../input/commands'
 import { itemAction, itemRange } from '../items/itemActions'
 import type { ItemEntity } from '../items/itemEntity'
@@ -8,6 +7,7 @@ import { LifePool } from '../life/lifePool'
 import type { Palette, Pose } from '../stickman/pose'
 import { CLIPS } from '../stickman/poses'
 import type { World } from '../world'
+import { Enemy } from './enemy'
 import { ENEMY_MOVES, type EnemyMoveId } from './enemyMoves'
 import { ENEMY_TYPES, randomPalette, type EnemyType } from './enemyTypes'
 
@@ -65,13 +65,9 @@ export interface GruntOptions {
  * - 取得攻擊名額 → 接近 → 出招 → 後退 → 冷卻
  * - 沒有名額 → 在一段距離外徘徊等待；空手時會去撿附近的物件
  */
-export class Grunt extends Fighter {
-  readonly team = 'gang' as const
+export class Grunt extends Enemy {
   readonly palette: Palette
   readonly scale: number
-  removed = false
-  /** 已經走進鎖定的畫面；之後不能再離開。 */
-  entered = false
 
   private state: GruntState = 'wait'
   private stateFrame = 0
@@ -273,7 +269,6 @@ export class Grunt extends Fighter {
     return this.state === 'attack' && !!this.act?.def.itemUse
   }
 
-  /** 是否正持有（或想取得）攻擊名額的狀態；離開這些狀態時由 World 收回名額。 */
   get wantsSlot(): boolean {
     return this.state === 'approach' || this.state === 'attack'
   }
@@ -330,6 +325,19 @@ export class Grunt extends Fighter {
 
   get label(): string {
     return this.def.label
+  }
+
+  get score(): number {
+    return this.def.score
+  }
+
+  defeat(): void {
+    if (this.life.isDead || this.removed) return
+    this.life.damage(this.life.hp)
+    this.act = null
+    this.setState('launched')
+    this.vx = -this.facing * 2
+    this.vh = 3
   }
 
   pose(): Pose {

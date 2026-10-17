@@ -15,8 +15,8 @@ function run(world: World, frames: number, held: Button[] = []) {
 
 /** 直接清掉場上所有雜兵（不測打鬥本身）。 */
 function wipe(world: World) {
-  for (const g of world.grunts) g.removed = true
-  world.grunts = []
+  for (const g of world.enemies) g.removed = true
+  world.enemies = []
 }
 
 /** 打完目前樓層的所有區段：走到每個區段觸發點，清光每一波。 */
@@ -56,7 +56,7 @@ describe('campaign', () => {
     world.agent.x = zone.start + VIEW_W / 2
     tick(world)
     expect(world.director?.locked).toBe(true)
-    expect(world.grunts.length).toBeGreaterThan(0)
+    expect(world.enemies.length).toBeGreaterThan(0)
     run(world, 30)
     run(world, 200, ['right'])
     expect(world.agent.x).toBeLessThanOrEqual(zone.start + VIEW_W - 8)
@@ -67,7 +67,7 @@ describe('campaign', () => {
     const zone = FLOORS[0].zones[0]
     world.agent.x = zone.start + VIEW_W / 2
     run(world, 400)
-    for (const g of world.grunts.filter((g) => g.entered)) {
+    for (const g of world.enemies.filter((g) => g.entered)) {
       expect(g.x).toBeGreaterThanOrEqual(zone.start + 8)
       expect(g.x).toBeLessThanOrEqual(zone.start + VIEW_W - 8)
     }

@@ -14,7 +14,9 @@ function fit() {
 addEventListener('resize', fit)
 fit()
 
-if (import.meta.env.DEV && location.search.includes('items')) {
+if (import.meta.env.DEV && location.search.includes('bosses')) {
+  import('./dev/bossGallery').then(({ drawBossGallery }) => drawBossGallery(ctx))
+} else if (import.meta.env.DEV && location.search.includes('items')) {
   import('./dev/itemGallery').then(({ drawItemGallery }) => drawItemGallery(ctx))
 } else if (import.meta.env.DEV && location.search.includes('poses')) {
   import('./dev/poseGallery').then(({ drawPoseGallery }) => {

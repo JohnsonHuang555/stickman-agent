@@ -53,8 +53,29 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     text(ctx, ITEM_TYPES[held.type].label + suffix, 44, 30, 6)
   }
 
+  const boss = world.boss
+  if (boss && !boss.removed) {
+    // Boss 命條固定在畫面下方，比雜兵的長
+    const w = 220
+    const x = (VIEW_W - w) / 2
+    text(ctx, boss.label, x, VIEW_H - 34, 8)
+    drawLifeBar(ctx, x, VIEW_H - 23, w, 7, boss.life)
+  }
+
+  const banner = world.bossBanner
+  if (banner && banner.until > world.realFrame) {
+    const t = banner.until - world.realFrame
+    if (Math.floor(t / 12) % 2 === 0) {
+      ctx.fillStyle = 'rgba(160,0,0,0.75)'
+      ctx.fillRect(0, 70, VIEW_W, 16)
+      text(ctx, 'WARNING', VIEW_W / 2, 74, 8, 'center')
+    }
+    text(ctx, banner.boss.label, VIEW_W / 2, 96, 16, 'center')
+    text(ctx, banner.boss.def.title, VIEW_W / 2, 118, 8, 'center')
+  }
+
   const focus = world.focus
-  if (focus && focus.until > world.realFrame && !focus.target.removed) {
+  if (focus && focus.until > world.realFrame && !focus.target.removed && focus.target !== boss) {
     text(ctx, focus.target.label, VIEW_W - 8, 8, 6, 'right')
     drawLifeBar(ctx, VIEW_W - 118, 18, 110, 5, focus.target.life)
   }

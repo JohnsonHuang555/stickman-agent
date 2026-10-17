@@ -96,19 +96,33 @@ function hipHeightOf(s: Skeleton, pose: Pose): number {
   return Math.max(s.footF[1], s.footB[1], 0) + pose.lift
 }
 
-/** 前手的螢幕位置與前臂方向（螢幕向量），用來把持有物畫在手上。 */
-export function frontHand(
-  pose: Pose,
-  x: number,
-  footY: number,
-  facing: 1 | -1,
-  scale = 1,
-): { x: number; y: number; dx: number; dy: number } {
+export interface Anchor {
+  x: number
+  y: number
+  /** 方向（螢幕向量）：手為前臂方向，頭為脊椎方向。 */
+  dx: number
+  dy: number
+}
+
+function anchor(pose: Pose, x: number, footY: number, facing: 1 | -1, scale: number, part: 'handF' | 'handB' | 'head'): Anchor {
   const s = solve(pose)
   const oy = footY - hipHeightOf(s, pose) * scale
-  const [dx, dy] = dir(pose.armF[1])
-  return { x: x + s.handF[0] * facing * scale, y: oy + s.handF[1] * scale, dx: dx * facing, dy }
+  const deg = part === 'handF' ? pose.armF[1] : part === 'handB' ? pose.armB[1] : 180 - pose.lean
+  const [dx, dy] = dir(deg)
+  const p = s[part]
+  return { x: x + p[0] * facing * scale, y: oy + p[1] * scale, dx: dx * facing, dy }
 }
+
+/** 前手的螢幕位置與前臂方向，用來把持有物畫在手上。 */
+export const frontHand = (pose: Pose, x: number, footY: number, facing: 1 | -1, scale = 1) =>
+  anchor(pose, x, footY, facing, scale, 'handF')
+
+export const backHand = (pose: Pose, x: number, footY: number, facing: 1 | -1, scale = 1) =>
+  anchor(pose, x, footY, facing, scale, 'handB')
+
+/** 頭的中心與脊椎方向，用來畫帽子、墨鏡等裝扮。 */
+export const headAnchor = (pose: Pose, x: number, footY: number, facing: 1 | -1, scale = 1) =>
+  anchor(pose, x, footY, facing, scale, 'head')
 
 export interface Palette {
   body: string
