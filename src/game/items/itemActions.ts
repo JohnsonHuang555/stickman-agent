@@ -10,7 +10,10 @@ interface SwingParams extends Omit<HitSpec, 'from' | 'to' | 'box'> {
   windup: number
   strike: number
   recover: number
+  /** 從身體中心到武器尖端的大約距離（AI 判斷出招距離用）。 */
   reach: number
+  /** 武器長度：設定時判定跟著畫面上的武器走。 */
+  length?: number
   up?: number
   h?: number
 }
@@ -19,31 +22,32 @@ interface SwingParams extends Omit<HitSpec, 'from' | 'to' | 'box'> {
 const ENEMY_EXTRA = { melee: 8, firearm: 16, throw: 10 } as const
 
 function swing(p: SwingParams, extra: number, itemUse = true): ActionDef {
-  const { poses, windup, strike, recover, reach, up, h, ...hit } = p
+  const { poses, windup, strike, recover, reach, length, up, h, ...hit } = p
   const w = windup + extra
   return {
     clip: attackClip(poses, w, strike, recover, undefined, extra ? 8 : 2),
     length: w + strike + recover,
     itemUse,
+    weaponLength: length,
     hit: { ...hit, from: w, to: w + strike - 1, box: { forward: 0, up: up ?? 12, w: reach, h: h ?? 28 } },
   }
 }
 
 const SWINGS: Record<'bat' | 'crowbar' | 'knife' | 'katana', SwingParams> = {
   bat: {
-    poses: ATTACK_POSES.swing, windup: 8, strike: 4, recover: 12, reach: 28,
+    poses: ATTACK_POSES.swing, windup: 8, strike: 4, recover: 12, reach: 36, length: 20,
     damage: 14, hitstun: 22, knockback: 2.5, knockdown: true, heavy: true,
   },
   crowbar: {
-    poses: ATTACK_POSES.swing, windup: 11, strike: 4, recover: 14, reach: 28,
+    poses: ATTACK_POSES.swing, windup: 11, strike: 4, recover: 14, reach: 36, length: 20,
     damage: 16, hitstun: 26, knockback: 2.5, heavy: true,
   },
   knife: {
-    poses: ATTACK_POSES.punch1, windup: 4, strike: 3, recover: 8, reach: 20, up: 22, h: 12,
+    poses: ATTACK_POSES.punch1, windup: 4, strike: 3, recover: 8, reach: 28, length: 10, up: 22, h: 12,
     damage: 8, hitstun: 16, knockback: 1.2,
   },
   katana: {
-    poses: ATTACK_POSES.swing, windup: 9, strike: 4, recover: 12, reach: 36,
+    poses: ATTACK_POSES.swing, windup: 9, strike: 4, recover: 12, reach: 44, length: 28,
     damage: 22, hitstun: 26, knockback: 3, knockdown: true, heavy: true,
   },
 }

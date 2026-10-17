@@ -257,7 +257,7 @@ export class Agent extends Fighter {
     const spec = act?.def.hit
     if (this.state !== 'action' || !act || !spec) return null
     if (act.frame < spec.from || act.frame > spec.to) return null
-    return { spec, box: this.relToWorld(spec.box), hitIds: act.hitIds }
+    return { spec, box: this.attackBox(act.def, spec), hitIds: act.hitIds }
   }
 
   receiveHit(spec: HitSpec, dir: Facing, world: World): void {

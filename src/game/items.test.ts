@@ -267,3 +267,41 @@ describe('armed enemies', () => {
     expect(heavy.held).toBeNull()
   })
 })
+
+describe('weapon hitboxes follow the weapon', () => {
+  it('the bat reaches as far as it is drawn, beyond a punch', () => {
+    const punched = setup([40])
+    tick(punched.world, ['punch'])
+    run(punched.world, 20)
+    expect(damageOf(punched.grunt)).toBe(0)
+
+    const batted = setup([40])
+    batted.agent.held = newItem('bat')
+    tick(batted.world, ['punch'])
+    run(batted.world, 30)
+    expect(damageOf(batted.grunt)).toBe(14)
+  })
+
+  it('the katana reaches farther than the bat', () => {
+    const batted = setup([52])
+    batted.agent.held = newItem('bat')
+    tick(batted.world, ['punch'])
+    run(batted.world, 30)
+    expect(damageOf(batted.grunt)).toBe(0)
+
+    const slashed = setup([52])
+    slashed.agent.held = newItem('katana')
+    tick(slashed.world, ['punch'])
+    run(slashed.world, 30)
+    expect(damageOf(slashed.grunt)).toBe(22)
+  })
+
+  it('a swing does not hit someone standing behind you', () => {
+    const { world, agent, grunt } = setup([-20])
+    agent.held = newItem('bat')
+    agent.facing = 1
+    tick(world, ['punch'])
+    run(world, 30)
+    expect(damageOf(grunt)).toBe(0)
+  })
+})

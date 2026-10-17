@@ -69,6 +69,8 @@ export interface ActionDef {
   armor?: boolean
   /** 使用近戰武器的動作；命中時消耗耐久度。 */
   itemUse?: boolean
+  /** 武器長度：判定框改為「手到武器尖端」這一段，跟著畫面上的武器走。 */
+  weaponLength?: number
   onStart?: (f: Fighter) => void
   tick?: (f: Fighter, frame: number, world: World) => void
 }

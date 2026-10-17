@@ -531,7 +531,7 @@ export class World {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
     const camX = this.camX
-    drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null)
+    drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame)
     for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)

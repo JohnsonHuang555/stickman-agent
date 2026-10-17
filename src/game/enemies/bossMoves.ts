@@ -49,7 +49,8 @@ export const BOSS_MOVES = {
   crowbarSwing: {
     clip: attackClip(ATTACK_POSES.swing, 14, 4, 14, undefined, 8),
     length: 32,
-    range: 28,
+    range: 40,
+    weaponLength: 20,
     hit: hit(14, 17, { box: { forward: 0, up: 12, w: 30, h: 28 }, damage: 16, hitstun: 22, knockback: 2.5, heavy: true }),
   },
   crowbarCharge: {
@@ -69,7 +70,8 @@ export const BOSS_MOVES = {
   bladeSlash: {
     clip: attackClip(ATTACK_POSES.swing, 8, 4, 10, undefined, 6),
     length: 22,
-    range: 34,
+    range: 46,
+    weaponLength: 28,
     hit: hit(8, 11, { box: { forward: 0, up: 12, w: 36, h: 28 }, damage: 14, hitstun: 20, knockback: 2 }),
     followUp: 'bladeSlash2',
   },
@@ -77,7 +79,7 @@ export const BOSS_MOVES = {
     clip: attackClip(ATTACK_POSES.punch2, 6, 4, 14, undefined, 4),
     length: 24,
     range: 34,
-    hit: hit(6, 9, { box: { forward: 0, up: 16, w: 36, h: 20 }, damage: 12, hitstun: 22, knockback: 3, knockdown: true }),
+    hit: hit(6, 9, { box: { forward: 0, up: 16, w: 44, h: 20 }, damage: 12, hitstun: 22, knockback: 3, knockdown: true }),
   },
   bladeDash: {
     ...charge(14, 12, 18, 5.5, { box: { forward: 0, up: 14, w: 30, h: 24 }, damage: 16, hitstun: 22, knockback: 3, knockdown: true, heavy: true }),

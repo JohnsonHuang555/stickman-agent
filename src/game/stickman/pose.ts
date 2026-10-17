@@ -79,7 +79,15 @@ function solve(p: Pose): Skeleton {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
-const lerpLimb = (a: Limb, b: Limb, t: number): Limb => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)]
+/**
+ * 角度走最短的那條弧。例如揮棒從後上方（-150°）到前方（80°），
+ * 會經過頭頂（±180°），而不是從身體下方繞過去。
+ */
+const lerpAngle = (a: number, b: number, t: number) => {
+  const diff = ((((b - a) % 360) + 540) % 360) - 180
+  return a + diff * t
+}
+const lerpLimb = (a: Limb, b: Limb, t: number): Limb => [lerpAngle(a[0], b[0], t), lerpAngle(a[1], b[1], t)]
 
 export function lerpPose(a: Pose, b: Pose, t: number): Pose {
   return {

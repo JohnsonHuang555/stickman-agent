@@ -18,7 +18,7 @@ function dim(ctx: CanvasRenderingContext2D, alpha: number): void {
 }
 
 export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nickname: string | null, frame: number): void {
-  drawBackground(ctx, 'office', frame * 0.3, null)
+  drawBackground(ctx, 'office', frame * 0.3, null, frame)
   dim(ctx, 0.45)
 
   drawStickman(ctx, ATTACK_POSES.flyingKick[1], 90, GROUND_Y - 30, 1, { body: '#111111', back: '#4a4a4a' }, 1.6)
@@ -50,7 +50,7 @@ export function drawLeaderboard(
   highlight: LeaderboardEntry | null,
   frame: number,
 ): void {
-  drawBackground(ctx, 'casino', frame * 0.3, null)
+  drawBackground(ctx, 'casino', frame * 0.3, null, frame)
   dim(ctx, 0.7)
   text(ctx, 'LEADERBOARD', VIEW_W / 2, 16, 16, 'center')
 

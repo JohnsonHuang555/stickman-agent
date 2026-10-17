@@ -1,21 +1,30 @@
 import type { ActionDef } from '../combat/types'
+import type { Fighter } from '../fighter'
 import { Clip } from '../stickman/clip'
 import { ATTACK_POSES, POSES, aerialClip, attackClip } from '../stickman/poses'
 
 const DESPERATION_COST = 8
 
+/** 出拳時往前小踏一步，讓連擊跟得上被打退的敵人。 */
+const punchStep = (f: Fighter, frame: number) => {
+  f.vx = frame >= 1 && frame <= 4 ? f.facing * 0.8 : 0
+}
+
 export const MOVES = {
   punch1: {
     clip: attackClip(ATTACK_POSES.punch1, 4, 4, 7),
     length: 15,
-    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 6, hitstun: 16, knockback: 0.4 },
+    // 拳頭判定到身體前方約 24px（踢腿約 30px）
+    hit: { from: 4, to: 6, box: { forward: 2, up: 24, w: 22, h: 10 }, damage: 6, hitstun: 16, knockback: 0.4 },
+    tick: punchStep,
     chain: { accept: 3, at: 9, next: 'punch2' },
     cancelToDesperation: true,
   },
   punch2: {
     clip: attackClip(ATTACK_POSES.punch2, 4, 4, 8),
     length: 16,
-    hit: { from: 4, to: 6, box: { forward: 2, up: 25, w: 16, h: 8 }, damage: 7, hitstun: 16, knockback: 0.4 },
+    hit: { from: 4, to: 6, box: { forward: 2, up: 24, w: 22, h: 10 }, damage: 7, hitstun: 16, knockback: 0.4 },
+    tick: punchStep,
     chain: { accept: 3, at: 9, next: 'punch3' },
   },
   punch3: {
@@ -24,7 +33,7 @@ export const MOVES = {
     hit: {
       from: 6,
       to: 9,
-      box: { forward: 2, up: 22, w: 18, h: 20 },
+      box: { forward: 2, up: 22, w: 24, h: 20 },
       damage: 10,
       hitstun: 20,
       knockback: 3,

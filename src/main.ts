@@ -48,7 +48,11 @@ function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
   document.fonts.ready.then(redrawStatic)
 }
 
-if (import.meta.env.DEV && params.has('bosses')) {
+if (import.meta.env.DEV && params.has('scene')) {
+  const floor = Number(params.get('scene')) || 1
+  const camX = Number(params.get('cam') ?? 300)
+  import('./dev/sceneGallery').then(({ sceneGallery }) => showStatic(sceneGallery(floor, camX)))
+} else if (import.meta.env.DEV && params.has('bosses')) {
   import('./dev/bossGallery').then(({ drawBossGallery }) => showStatic(drawBossGallery))
 } else if (import.meta.env.DEV && params.has('items')) {
   import('./dev/itemGallery').then(({ drawItemGallery }) => showStatic(drawItemGallery))

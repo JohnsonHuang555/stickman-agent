@@ -39,13 +39,13 @@ describe('crate loot table', () => {
 describe('crates', () => {
   it(`take ${CRATE_HITS} hits to break and drop their loot`, () => {
     const world = sandbox()
-    world.crates = [new Crate(316, 'gold')]
+    world.crates = [new Crate(316, 'bat')]
     punch(world)
     expect(world.crates).toHaveLength(1)
     punch(world)
     expect(world.crates).toHaveLength(0)
     run(world, 40)
-    expect(world.items.map((i) => i.item.type)).toContain('gold')
+    expect(world.items.map((i) => i.item.type)).toContain('bat')
   })
 
   it('bullets and thrown items break them too', () => {

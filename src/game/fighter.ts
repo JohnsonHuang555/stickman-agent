@@ -1,5 +1,5 @@
 import { GRAVITY, GROUND_Y } from './constants'
-import type { ActiveHit, Box, HitSpec, Hitter, RelBox, Team } from './combat/types'
+import type { ActionDef, ActiveHit, Box, HitSpec, Hitter, RelBox, Team } from './combat/types'
 import type { Facing } from './input/commands'
 import { drawItemHeld } from './items/itemArt'
 import { ITEM_TYPES, categoryOf, type Item } from './items/itemTypes'
@@ -93,6 +93,22 @@ export abstract class Fighter implements Hitter {
     }
     this.x = Math.min(world.floorWidth - 8, Math.max(8, this.x + this.vx))
     return landed
+  }
+
+  /** 這一招本幀的判定框：武器招式跟著武器走，其餘用招式設定的相對框。 */
+  protected attackBox(def: ActionDef, spec: HitSpec): Box {
+    return def.weaponLength ? this.weaponBox(def.weaponLength) : this.relToWorld(spec.box)
+  }
+
+  /** 從前手沿前臂方向延伸 length 的武器，取其外接框並稍微放寬。 */
+  private weaponBox(length: number): Box {
+    const hand = this.handPosition()
+    const tipX = hand.x + hand.dx * length * this.scale
+    const tipY = hand.y + hand.dy * length * this.scale
+    const pad = 5
+    const x = Math.min(hand.x, tipX) - pad
+    const y = Math.min(hand.y, tipY) - pad
+    return { x, y, w: Math.abs(tipX - hand.x) + pad * 2, h: Math.abs(tipY - hand.y) + pad * 2 }
   }
 
   relToWorld(rel: RelBox): Box {
