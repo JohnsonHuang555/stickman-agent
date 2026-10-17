@@ -70,6 +70,8 @@ export class Grunt extends Fighter {
   readonly palette: Palette
   readonly scale: number
   removed = false
+  /** 已經走進鎖定的畫面；之後不能再離開。 */
+  entered = false
 
   private state: GruntState = 'wait'
   private stateFrame = 0

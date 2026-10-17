@@ -30,6 +30,18 @@ function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, si
   ctx.fillText(s, x, y)
 }
 
+/** 走上樓梯後的過層結算：畫面變暗，獎勵分數逐行出現。 */
+function drawClear(ctx: CanvasRenderingContext2D, world: World): void {
+  const t = world.phaseFrame
+  ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, t / 30)})`
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+  const cx = VIEW_W / 2
+  text(ctx, `${world.floor!.label} CLEAR`, cx, 70, 16, 'center')
+  if (t > 40) text(ctx, `LIFE BONUS  ${String(world.clearBonus.life).padStart(5, ' ')}`, cx, 115, 8, 'center')
+  if (t > 70) text(ctx, `TIME BONUS  ${String(world.clearBonus.time).padStart(5, ' ')}`, cx, 135, 8, 'center')
+  if (t > 100) text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, cx, 165, 8, 'center')
+}
+
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, 8, 8)
   text(ctx, 'AGENT', 8, 20, 6)
@@ -45,6 +57,33 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   if (focus && focus.until > world.realFrame && !focus.target.removed) {
     text(ctx, focus.target.label, VIEW_W - 8, 8, 6, 'right')
     drawLifeBar(ctx, VIEW_W - 118, 18, 110, 5, focus.target.life)
+  }
+
+  const floor = world.floor
+  if (floor) {
+    text(ctx, floor.label, VIEW_W / 2, 8, 8, 'center')
+    if (world.phase === 'play' && world.director?.showGo(world.agent.x) && Math.floor(world.realFrame / 20) % 2 === 0) {
+      text(ctx, 'GO →', VIEW_W - 16, 100, 16, 'right')
+    }
+    if (world.phase === 'intro') {
+      const alpha = Math.min(1, (110 - world.phaseFrame) / 20)
+      ctx.globalAlpha = Math.max(0, alpha)
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'
+      ctx.fillRect(0, VIEW_H / 2 - 34, VIEW_W, 56)
+      text(ctx, floor.label, VIEW_W / 2, VIEW_H / 2 - 26, 24, 'center')
+      text(ctx, floor.subtitle, VIEW_W / 2, VIEW_H / 2 + 4, 8, 'center')
+      ctx.globalAlpha = 1
+    }
+    if (world.phase === 'clear') drawClear(ctx, world)
+  }
+  if (world.phase === 'complete') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+    text(ctx, 'MISSION COMPLETE', VIEW_W / 2, VIEW_H / 2 - 30, 16, 'center')
+    text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2, 8, 'center')
+    if (world.phaseFrame > 60 && Math.floor(world.realFrame / 30) % 2 === 0) {
+      text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 24, 8, 'center')
+    }
   }
 
   ctx.font = '7px monospace'

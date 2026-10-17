@@ -10,7 +10,9 @@ import type { Facing } from './input/commands'
 import { Bullet } from './items/bullet'
 import { ItemEntity } from './items/itemEntity'
 import { categoryOf, newItem, type Item, type ItemTypeId } from './items/itemTypes'
-import { drawLobby } from './render/background'
+import { FLOORS, type FloorDef, type Spawn, type Theme } from './level/floors'
+import { ZoneDirector } from './level/zoneDirector'
+import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
 import { Particles } from './render/particles'
 
@@ -19,6 +21,12 @@ const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pist
 const SEPARATION = 14
 /** 撿東西的距離。 */
 const PICKUP_REACH = 16
+const INTRO_FRAMES = 110
+const CLEAR_FRAMES = 200
+/** 過層獎勵：每點血量的分數，以及用時獎勵的上限與每秒扣分。 */
+const LIFE_BONUS_PER_HP = 20
+const TIME_BONUS_MAX = 5000
+const TIME_BONUS_PER_SECOND = 25
 
 const PISTOL_BULLET: HitSpec = {
   from: 0, to: Infinity, box: { forward: 0, up: 0, w: 6, h: 2 },
@@ -29,14 +37,30 @@ const SHOTGUN_PELLET: HitSpec = {
   damage: 20, hitstun: 24, knockback: 3, knockdown: true, heavy: true,
 }
 
+/**
+ * - campaign：正式遊玩，從 1F 往上打
+ * - training：練習場，雜兵與物件持續重生
+ * - sandbox：空地板，測試用
+ */
+export type GameMode = 'campaign' | 'training' | 'sandbox'
+
+/**
+ * - intro：剛進樓層，顯示樓層字卡（遊戲照常進行）
+ * - play：遊玩中
+ * - clear：走上樓梯，結算過層獎勵
+ * - complete：通關
+ */
+export type Phase = 'intro' | 'play' | 'clear' | 'complete'
+
 export interface WorldOptions {
-  /** 練習場：雜兵與物件會持續重生。 */
-  training?: boolean
+  mode?: GameMode
+  /** campaign 從第幾層開始（0 起算），測試用。 */
+  startFloor?: number
 }
 
-/** 練習場：目前只有一層地板與會重生的雜兵，用來調整手感與 AI。 */
 export class World {
-  readonly floorWidth = 1440
+  readonly mode: GameMode
+  floorWidth = 1440
   readonly agent = new Agent(80)
   readonly slots = new AttackSlots(2)
   grunts: Grunt[] = []
@@ -49,10 +73,19 @@ export class World {
   debug = false
   camX = 0
   gameOver = false
-  /** Game Over 後玩家按鍵要求重來；由 main 建立新的 World。 */
+  /** Game Over 或通關後玩家按鍵要求重來；由 main 建立新的 World。 */
   restartRequested = false
   /** HUD 右側顯示的敵人（最近被打的那個）。 */
   focus: { target: Grunt; until: number } | null = null
+
+  floorIndex = 0
+  floor: FloorDef | null = null
+  director: ZoneDirector | null = null
+  phase: Phase = 'play'
+  phaseFrame = 0
+  /** 本層已經過的幀數（算用時獎勵）。 */
+  floorFrames = 0
+  clearBonus = { life: 0, time: 0 }
 
   private hitstop = 0
   private shake = 0
@@ -60,11 +93,12 @@ export class World {
   private itemRespawnAt = 0
   private readonly particles = new Particles()
   private readonly buffer = new InputBuffer()
-  private readonly training: boolean
 
   constructor(options: WorldOptions = {}) {
-    this.training = options.training ?? true
-    if (this.training) {
+    this.mode = options.mode ?? 'campaign'
+    if (this.mode === 'campaign') {
+      this.loadFloor(options.startFloor ?? 0)
+    } else if (this.mode === 'training') {
       this.grunts.push(new Grunt(260, 'thug'), new Grunt(330, 'bruiser'))
       const layout: [ItemTypeId, number][] = [
         ['chair', 160], ['knife', 420], ['cabinet', 600], ['katana', 820], ['shotgun', 1050], ['chair', 1250],
@@ -73,22 +107,67 @@ export class World {
     }
   }
 
+  get theme(): Theme {
+    return this.floor?.theme ?? 'lobby'
+  }
+
+  /** 進入新樓層：清空場上，特務回到左側，保留血量、持有物與分數。 */
+  private loadFloor(index: number): void {
+    this.floorIndex = index
+    this.floor = FLOORS[index]
+    this.floorWidth = this.floor.width
+    this.director = new ZoneDirector(this.floor)
+    this.grunts = []
+    this.items = []
+    this.bullets = []
+    this.focus = null
+    this.agent.x = 40
+    this.agent.vx = 0
+    this.camX = 0
+    this.floorFrames = 0
+    for (const [type, x] of this.floor.items) this.placeItem(type, x)
+    this.setPhase('intro')
+  }
+
+  private setPhase(phase: Phase): void {
+    this.phase = phase
+    this.phaseFrame = 0
+  }
+
   update(input: InputSnapshot): void {
     this.realFrame++
+    this.phaseFrame++
     this.buffer.record(input, this.realFrame)
     if (input.pressed.includes('debug')) this.debug = !this.debug
-    if (this.gameOver) {
-      if (input.pressed.some((b) => b === 'punch' || b === 'jump')) this.restartRequested = true
-    } else if (input.pressed.includes('pause')) {
-      this.paused = !this.paused
+
+    const ended = this.gameOver || this.phase === 'complete'
+    if (ended) {
+      if (this.phaseFrame > 60 && input.pressed.some((b) => b === 'punch' || b === 'jump')) this.restartRequested = true
+      if (this.gameOver) this.stepSimulation(input)
+      return
     }
+    if (input.pressed.includes('pause')) this.paused = !this.paused
     if (this.paused) return
 
+    if (this.phase === 'clear') {
+      if (this.phaseFrame >= CLEAR_FRAMES) {
+        if (this.floorIndex + 1 < FLOORS.length) this.loadFloor(this.floorIndex + 1)
+        else this.setPhase('complete')
+      }
+      return
+    }
+    if (this.phase === 'intro' && this.phaseFrame >= INTRO_FRAMES) this.setPhase('play')
+
+    this.stepSimulation(input)
+  }
+
+  private stepSimulation(input: InputSnapshot): void {
     this.agent.readInput(input, this.buffer, this.realFrame)
     if (this.hitstop > 0) {
       this.hitstop--
       return
     }
+    this.floorFrames++
 
     this.agent.update(this)
     for (const g of this.grunts) g.update(this)
@@ -102,12 +181,61 @@ export class World {
     this.grunts = this.grunts.filter((g) => !g.removed)
     this.items = this.items.filter((i) => !i.removed)
     this.bullets = this.bullets.filter((b) => !b.removed)
-    if (this.training) this.respawnTraining()
-    if (this.agent.defeated) this.gameOver = true
 
-    const target = Math.min(this.floorWidth - VIEW_W, Math.max(0, this.agent.x - VIEW_W / 2))
-    this.camX += (target - this.camX) * 0.15
+    if (this.mode === 'training') this.respawnTraining()
+    if (this.director && !this.gameOver) this.runDirector()
+    this.confineToLock()
+    if (this.agent.defeated && !this.gameOver) {
+      this.gameOver = true
+      this.phaseFrame = 0
+    }
+
+    this.updateCamera()
     this.shake *= 0.82
+  }
+
+  // ── 樓層進程 ──────────────────────────────────────────
+
+  private runDirector(): void {
+    const director = this.director!
+    const alive = this.grunts.filter((g) => !g.isGone).length
+    for (const spawn of director.update(this.realFrame, this.agent.x, alive)) this.spawn(spawn)
+
+    if (director.allCleared && this.agent.x >= this.floor!.stairsX - 6 && !this.agent.airborne) {
+      const seconds = Math.floor(this.floorFrames / 60)
+      this.clearBonus = {
+        life: this.agent.life.hp * LIFE_BONUS_PER_HP,
+        time: Math.max(0, TIME_BONUS_MAX - seconds * TIME_BONUS_PER_SECOND),
+      }
+      this.score += this.clearBonus.life + this.clearBonus.time
+      this.setPhase('clear')
+    }
+  }
+
+  private spawn(spawn: Spawn): void {
+    const left = this.director?.lockLeft ?? this.camX
+    const x = spawn.side === 'left' ? left - 16 : left + VIEW_W + 16
+    const held = spawn.held === undefined ? undefined : spawn.held === null ? null : newItem(spawn.held)
+    this.grunts.push(new Grunt(Math.min(this.floorWidth - 8, Math.max(8, x)), spawn.type, { held }))
+  }
+
+  /** 鎖鏡頭時，特務不能離開畫面；已經走進畫面的雜兵也不能再出去。 */
+  private confineToLock(): void {
+    const left = this.director?.lockLeft
+    if (left === null || left === undefined) return
+    const right = left + VIEW_W
+    this.agent.x = Math.min(right - 8, Math.max(left + 8, this.agent.x))
+    for (const g of this.grunts) {
+      if (g.x > left + 8 && g.x < right - 8) g.entered = true
+      if (g.entered) g.x = Math.min(right - 8, Math.max(left + 8, g.x))
+    }
+  }
+
+  private updateCamera(): void {
+    const lock = this.director?.lockLeft
+    const target = lock ?? this.agent.x - VIEW_W / 2
+    const clamped = Math.min(this.floorWidth - VIEW_W, Math.max(0, target))
+    this.camX += (clamped - this.camX) * 0.15
   }
 
   // ── 持有物 ──────────────────────────────────────────
@@ -246,11 +374,8 @@ export class World {
     if (alive >= TRAINING_GRUNTS) {
       this.respawnAt = this.realFrame + 90
     } else if (this.realFrame >= this.respawnAt) {
-      const fromLeft = Math.random() < 0.5
-      let x = fromLeft ? this.camX - 20 : this.camX + VIEW_W + 20
-      x = Math.min(this.floorWidth - 10, Math.max(10, x))
       const type = ENEMY_TYPE_IDS[Math.floor(Math.random() * ENEMY_TYPE_IDS.length)]
-      this.grunts.push(new Grunt(x, type))
+      this.spawn({ type, side: Math.random() < 0.5 ? 'left' : 'right' })
       this.respawnAt = this.realFrame + 90
     }
 
@@ -272,7 +397,7 @@ export class World {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
     const camX = Math.round(this.camX)
-    drawLobby(ctx, camX)
+    drawBackground(ctx, this.theme, camX, this.floor?.stairsX ?? null)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)
     for (const g of this.grunts) g.draw(ctx, camX)

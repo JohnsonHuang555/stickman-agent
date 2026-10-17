@@ -6,7 +6,7 @@ import { newItem } from './items/itemTypes'
 import { World } from './world'
 
 function setup(gaps: number[] = [14]) {
-  const world = new World({ training: false })
+  const world = new World({ mode: 'sandbox' })
   world.agent.x = 300
   const grunts = gaps.map((g) => new Grunt(300 + g, 'heavy', { passive: true, held: null }))
   world.grunts = grunts
@@ -198,7 +198,7 @@ describe('throwing', () => {
 
 describe('dropping', () => {
   it('the agent drops the held item when knocked down', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     world.agent.held = newItem('bat')
     world.grunts = [new Grunt(318, 'heavy', { moves: ['slam'], held: null })]
@@ -208,7 +208,7 @@ describe('dropping', () => {
   })
 
   it('a knocked-down grunt drops its weapon', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const grunt = new Grunt(314, 'bruiser', { passive: true, held: newItem('crowbar') })
     world.grunts = [grunt]
@@ -224,7 +224,7 @@ describe('dropping', () => {
 
 describe('armed enemies', () => {
   it('a gunman shoots a standing agent from range', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     world.grunts = [new Grunt(450, 'gunman', { held: newItem('pistol', 8) })]
     run(world, 400)
@@ -232,7 +232,7 @@ describe('armed enemies', () => {
   })
 
   it('crouching ducks under bullets', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const gunman = new Grunt(450, 'gunman', { held: newItem('pistol', 8) })
     world.grunts = [gunman]
@@ -242,7 +242,7 @@ describe('armed enemies', () => {
   })
 
   it('an unarmed bruiser walks over and picks up a bat', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 100
     const bruiser = new Grunt(300, 'bruiser', { held: null })
     world.grunts = [bruiser]
@@ -252,7 +252,7 @@ describe('armed enemies', () => {
   })
 
   it('a heavy picks up a chair and throws it at the agent', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 150
     const heavy = new Grunt(300, 'heavy', { held: null, moves: ['jab'] })
     world.grunts = [heavy]

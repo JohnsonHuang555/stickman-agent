@@ -6,7 +6,7 @@ import { World } from './world'
 
 /** 建一個只有一個雜兵、站在特務正前方的世界。 */
 function arena(gap = 14) {
-  const world = new World({ training: false })
+  const world = new World({ mode: 'sandbox' })
   world.agent.x = 300
   const grunt = new Grunt(300 + gap, 'heavy', { passive: true })
   world.grunts = [grunt]
@@ -130,7 +130,7 @@ describe('World simulation', () => {
 
 describe('Grunt AI', () => {
   function brawl(types: EnemyType[]) {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 400
     world.grunts = types.map((t, i) => new Grunt(250 + i * 60 + (i % 2 ? 250 : 0), t))
     return world
@@ -164,11 +164,14 @@ describe('Grunt AI', () => {
     const world = brawl(['heavy', 'thug', 'knifer'])
     for (let i = 0; i < 6000 && !world.gameOver; i++) tick(world)
     tick(world, ['punch'])
+    expect(world.restartRequested).toBe(false) // 剛陣亡時忽略連打
+    run(world, 60)
+    tick(world, ['punch'])
     expect(world.restartRequested).toBe(true)
   })
 
   it('the heavy shrugs off a jab during its slam (super armor) and still lands it', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     const heavy = new Grunt(318, 'heavy', { moves: ['slam'] })
     world.grunts = [heavy]
@@ -187,7 +190,7 @@ describe('Grunt AI', () => {
   })
 
   it('crouching ducks under a jab', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     world.grunts = [new Grunt(318, 'thug', { moves: ['jab'] })]
     run(world, 400, ['down'])
@@ -195,7 +198,7 @@ describe('Grunt AI', () => {
   })
 
   it('a kick still hits a crouching agent', () => {
-    const world = new World({ training: false })
+    const world = new World({ mode: 'sandbox' })
     world.agent.x = 300
     world.grunts = [new Grunt(320, 'thug', { moves: ['kick'] })]
     run(world, 400, ['down'])

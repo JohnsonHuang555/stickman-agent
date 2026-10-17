@@ -26,11 +26,17 @@ if (import.meta.env.DEV && location.search.includes('items')) {
   const keyboard = new Keyboard()
   keyboard.attach(window)
 
-  let world = new World()
+  // ?training 進練習場；?floor=2 直接從 2F 開始（開發用）
+  const params = new URLSearchParams(location.search)
+  const options = {
+    mode: params.has('training') ? ('training' as const) : ('campaign' as const),
+    startFloor: import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0,
+  }
+  let world = new World(options)
   startLoop(
     () => {
       world.update(keyboard.poll())
-      if (world.restartRequested) world = new World()
+      if (world.restartRequested) world = new World(options)
     },
     () => world.render(ctx),
   )
