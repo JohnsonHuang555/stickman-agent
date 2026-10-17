@@ -26,6 +26,8 @@ import { Particles } from './render/particles'
 const TRAINING_GRUNTS = 3
 const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pistol', 'shotgun', 'chair', 'cabinet']
 const SEPARATION = 14
+/** 空中追擊時特務與浮空敵人之間的最小間距。 */
+const AIR_SPACING = 16
 /** 撿東西的距離。 */
 const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
@@ -220,6 +222,7 @@ export class World {
     this.particles.update()
     this.combo.update(this.realFrame)
     this.separateGrunts()
+    this.keepAirSpacing()
     this.resolveHits()
 
     for (const g of this.enemies) if (!g.wantsSlot) this.slots.release(g.id)
@@ -414,6 +417,23 @@ export class World {
 
   private get fighters(): Fighter[] {
     return [this.agent, ...this.enemies]
+  }
+
+  /**
+   * 空中追擊時，特務最多貼近浮空的敵人到 AIR_SPACING，不會穿過去跑到前面
+   *（一直按著方向鍵追打時，特務會自然停在打得到的位置）。
+   */
+  private keepAirSpacing(): void {
+    const agent = this.agent
+    if (!agent.airborne) return
+    for (const e of this.enemies) {
+      if (!(e instanceof Grunt) || !e.juggled || Math.abs(e.h - agent.h) > 50) continue
+      const dx = e.x - agent.x
+      if (Math.abs(dx) >= AIR_SPACING) continue
+      const side = dx === 0 ? agent.facing : Math.sign(dx)
+      agent.x = e.x - side * AIR_SPACING
+      if (Math.sign(agent.vx) === side) agent.vx = 0
+    }
   }
 
   /** 站在地上的雜兵彼此稍微推開，避免疊成一團。 */

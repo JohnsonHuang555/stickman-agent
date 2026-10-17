@@ -17,6 +17,8 @@ const HEAVY_CARRY_SPEED = 0.5
 const JUMP_VELOCITY = 6.8
 const AGENT_GRAVITY = 0.36
 const AIR_DRIFT = 2.2
+/** 空中轉向時，每幀往目標速度靠近的比例。 */
+const AIR_STEER = 0.15
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
 const COMMAND_BUFFER = 10
 const JUMP_BUFFER = 8
@@ -128,7 +130,10 @@ export class Agent extends Fighter {
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
     if (cmd && this.tryStart(cmd)) return
-    if (this.airborne) return
+    if (this.airborne) {
+      this.steerInAir()
+      return
+    }
 
     if (this.grabUntil >= now) {
       this.grabUntil = -1
@@ -231,6 +236,14 @@ export class Agent extends Fighter {
     return true
   }
 
+  /** 空中：按方向鍵轉身，並逐漸往該方向調整速度（保留跳躍的慣性）。 */
+  private steerInAir(): void {
+    const dir = this.heldDir()
+    if (!dir) return
+    this.facing = dir
+    this.vx += (dir * AIR_DRIFT - this.vx) * AIR_STEER
+  }
+
   private startJump(dir: -1 | 0 | 1): void {
     if (dir) this.facing = dir
     this.vx = dir * AIR_DRIFT
@@ -245,6 +258,8 @@ export class Agent extends Fighter {
     this.crouching = false
     this.walking = false
     if (!def.aerial) this.vx = 0
+    // 空中出招（含連段的下一招）用當下按著的方向：敵人飄到身後時可以轉身打
+    if (def.aerial && this.airborne && this.heldDir()) this.facing = this.heldDir() as Facing
     if (def.invuln) this.invuln = def.length
     def.onStart?.(this)
   }

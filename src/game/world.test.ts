@@ -228,3 +228,39 @@ describe('reach', () => {
     expect(kicked.grunt.life.max - kicked.grunt.life.hp).toBe(10)
   })
 })
+
+describe('air control', () => {
+  it('pressing a direction in the air turns the agent and steers toward it', () => {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump'])
+    run(world, 3)
+    expect(world.agent.facing).toBe(1)
+    const x0 = world.agent.x
+    run(world, 15, ['left'])
+    expect(world.agent.facing).toBe(-1)
+    expect(world.agent.x).toBeLessThan(x0)
+  })
+
+  it('steering keeps some of the jump momentum instead of reversing instantly', () => {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump'], ['right'])
+    run(world, 2, ['right'])
+    const x0 = world.agent.x
+    tick(world, [], ['left'])
+    expect(world.agent.x).toBeGreaterThan(x0) // 第一幀仍往右滑
+  })
+
+  it('an air attack faces the held direction, so you can hit someone behind you', () => {
+    const { world } = arena()
+    const behind = new Grunt(282, 'heavy', { passive: true })
+    world.enemies = [behind]
+    world.agent.facing = 1
+    tick(world, ['jump'])
+    run(world, 1)
+    tick(world, ['punch'], ['left'])
+    run(world, 12, ['left'])
+    expect(behind.life.max - behind.life.hp).toBe(5)
+  })
+})

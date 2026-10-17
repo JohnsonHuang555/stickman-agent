@@ -313,3 +313,33 @@ describe('air feel (regression for "enemies freeze in the air")', () => {
     expect(grunt.x - x0).toBeLessThan(8)
   })
 })
+
+describe('holding a direction during the air combo', () => {
+  it('holding toward the enemy the whole time does not overshoot it', () => {
+    for (const delays of [[8, 9, 8, 8], [24, 22, 28, 30]]) {
+      const { world, damage } = setup()
+      const hold: Button[] = ['right']
+      const step = (pressed: Button[], wait: number, extra: Button[] = []) => {
+        tick(world, pressed, [...hold, ...extra])
+        run(world, wait - 1, hold)
+      }
+      step(['punch'], delays[0], ['up'])
+      step(['jump'], delays[1])
+      step(['punch'], delays[2])
+      step(['punch'], delays[3])
+      step(['kick'], 40)
+      expect(damage(), `delays ${delays}`).toBe(29)
+    }
+  })
+
+  it('the agent never ends up inside or past a juggled enemy', () => {
+    const { world, grunt } = setup()
+    tick(world, ['punch'], ['up', 'right'])
+    run(world, 6, ['right'])
+    tick(world, ['jump'], ['right'])
+    for (let i = 0; i < 30; i++) {
+      tick(world, [], ['right'])
+      if (grunt.juggled) expect(grunt.x - world.agent.x).toBeGreaterThanOrEqual(16 - 0.001)
+    }
+  })
+})
