@@ -107,3 +107,9 @@ describe('walk leg lift (regression for "legs lift too high")', () => {
     expect(knee - standingKnee).toBeLessThan(2.5)
   })
 })
+
+describe('air kicks look like the title screen (regression for "the flying kick should look like the cover")', () => {
+  it('the air kick and the flying kick share the cover pose', () => {
+    expect(ATTACK_POSES.airKick).toBe(ATTACK_POSES.flyingKick)
+  })
+})

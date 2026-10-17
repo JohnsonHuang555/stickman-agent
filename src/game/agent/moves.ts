@@ -118,12 +118,12 @@ export const MOVES = {
     },
     airAssist: { rise: true },
   },
-  /** 空中單按 X：原地橫踢，不往前衝（保留跳躍原本的慣性）。 */
+  /** 空中單按 X：和飛踢同樣的出腳姿勢，但不往前衝（保留跳躍原本的慣性）。 */
   airKick: {
-    clip: attackClip(ATTACK_POSES.airKick, 3, 6, 7, POSES.jumpFall),
+    clip: attackClip(ATTACK_POSES.airKick, 3, 8, 5, POSES.jumpFall),
     length: 16,
     aerial: true,
-    hit: { from: 3, to: 8, box: { forward: 2, up: 6, w: 30, h: 16 }, damage: 9, hitstun: 20, knockback: 2 },
+    hit: { from: 3, to: 10, box: { forward: 2, up: -4, w: 30, h: 16 }, damage: 9, hitstun: 20, knockback: 2 },
   },
   /** 空中 ←/→ + X：往該方向飛踢衝出去。 */
   flyingKick: {
