@@ -157,3 +157,66 @@ describe('juggle exceptions', () => {
     expect(grunt.juggled).toBe(true)
   })
 })
+
+describe('combo counter and hints', () => {
+  it('the full air combo counts 4 hits', () => {
+    const { world } = setup()
+    fullCombo(world)
+    expect(world.combo.count).toBe(4)
+    expect(world.score).toBe(4 * 10)
+  })
+
+  it('an enemy hit on the agent breaks the combo', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.agent.x = 300
+    world.enemies = [new Grunt(318, 'thug', { moves: ['kick'] })]
+    world.combo.hit(world.realFrame)
+    world.combo.hit(world.realFrame)
+    for (let i = 0; i < 600 && world.agent.life.hp === world.agent.life.max; i++) {
+      world.combo.hit(world.realFrame) // 持續保持連擊，直到特務被打中
+      tick(world)
+    }
+    expect(world.agent.life.hp).toBeLessThan(world.agent.life.max)
+    expect(world.combo.count).toBe(0)
+  })
+
+  it('hints the next button through the air combo', () => {
+    const { world } = setup()
+    const hints: (string | null)[] = []
+    const record = () => {
+      const h = world.comboHint()
+      if (h && hints[hints.length - 1] !== h) hints.push(h)
+    }
+    tick(world, ['punch'], ['up'])
+    for (let i = 0; i < 7; i++) {
+      tick(world, [], ['up'])
+      record()
+    }
+    tick(world, ['jump'])
+    for (let i = 0; i < 8; i++) {
+      tick(world)
+      record()
+    }
+    tick(world, ['punch'])
+    for (let i = 0; i < 7; i++) {
+      tick(world)
+      record()
+    }
+    tick(world, ['punch'])
+    for (let i = 0; i < 7; i++) {
+      tick(world)
+      record()
+    }
+    expect(hints).toEqual(['jump', 'punch', 'kick'])
+  })
+
+  it('no hint when the launcher whiffs', () => {
+    const { world, grunt } = setup()
+    grunt.x = 500
+    tick(world, ['punch'], ['up'])
+    for (let i = 0; i < 15; i++) {
+      tick(world, [], ['up'])
+      expect(world.comboHint()).toBeNull()
+    }
+  })
+})

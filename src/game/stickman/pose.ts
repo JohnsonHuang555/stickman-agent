@@ -26,6 +26,9 @@ export const BODY = {
   shin: 11.5,
 } as const
 
+/** 手腳與軀幹的線條粗細。 */
+export const LINE_WIDTH = 3.4
+
 /** 站立時的身高（受擊框用）。 */
 export const STAND_HEIGHT = 46
 /** 蹲下時的高度；高處攻擊（敵人刺拳、高的子彈）要高於這個值才躲得掉。 */
@@ -163,7 +166,7 @@ export function drawStickman(
 
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.lineWidth = 2.5 * scale
+  ctx.lineWidth = LINE_WIDTH * scale
 
   const chain = (color: string, ...pts: Vec[]) => {
     ctx.strokeStyle = color

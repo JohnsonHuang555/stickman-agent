@@ -7,7 +7,7 @@ const press = (button: Button, frame: number): Press => ({ button, frame })
 function recognize(
   presses: Press[],
   frame: number,
-  opts: { airborne?: boolean; crouching?: boolean; up?: boolean; down?: boolean } = {},
+  opts: { airborne?: boolean; crouching?: boolean; up?: boolean; down?: boolean; held?: Button[] } = {},
 ) {
   return recognizeCommand({
     frame,
@@ -16,6 +16,7 @@ function recognize(
     crouching: opts.crouching ?? false,
     up: opts.up,
     down: opts.down,
+    held: opts.held && new Set(opts.held),
   })
 }
 
@@ -37,6 +38,16 @@ describe('recognizeCommand', () => {
   it('z then x within the simultaneous window is still the desperation move', () => {
     const presses = [press('punch', 10), press('kick', 10 + SIMULTANEOUS_WINDOW)]
     expect(recognize(presses, 10 + SIMULTANEOUS_WINDOW)?.kind).toBe('desperation')
+  })
+
+  it('z then x while z is still held is the desperation move', () => {
+    const presses = [press('punch', 10), press('kick', 12)]
+    expect(recognize(presses, 12, { held: ['punch', 'kick'] })?.kind).toBe('desperation')
+  })
+
+  it('tapping z then x (z already released) is just a kick, even within the window', () => {
+    const presses = [press('punch', 10), press('kick', 12)]
+    expect(recognize(presses, 12, { held: ['kick'] })?.kind).toBe('kick')
   })
 
   it('z then x outside the window is just a kick', () => {

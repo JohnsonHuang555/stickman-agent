@@ -1,6 +1,8 @@
 import type { Sound } from '../audio/sfx'
 import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
+import { MOVES } from './agent/moves'
+import { ComboCounter } from './combat/comboCounter'
 import { overlaps, type HitSpec, type Hitter } from './combat/types'
 import { GROUND_Y, VIEW_W } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
@@ -29,6 +31,11 @@ const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
 const BOSS_BANNER_FRAMES = 150
 const POPUP_FRAMES = 50
+/** 每次命中的基本分，乘上連擊倍率。 */
+const HIT_SCORE = 10
+
+export type ComboHint = 'jump' | 'punch' | 'kick'
+const HINT_LABELS: Record<ComboHint, string> = { jump: 'SPACE', punch: 'Z', kick: 'X' }
 const MUZZLE_FRAMES = 5
 /** 自動撿起醫療箱、分數道具的距離。 */
 const CONSUME_REACH = 12
@@ -80,6 +87,7 @@ export class World {
   floorWidth = 1440
   readonly agent = new Agent(80)
   readonly slots = new AttackSlots(2)
+  readonly combo = new ComboCounter()
   enemies: Enemy[] = []
   items: ItemEntity[] = []
   bullets: Bullet[] = []
@@ -210,6 +218,7 @@ export class World {
     for (const i of this.items) i.update(this)
     for (const b of this.bullets) b.update(this)
     this.particles.update()
+    this.combo.update(this.realFrame)
     this.separateGrunts()
     this.resolveHits()
 
@@ -450,10 +459,12 @@ export class World {
         this.sound(target === this.agent ? 'hurt' : hit.spec.heavy ? 'heavyHit' : 'hit')
         if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
 
+        if (target === this.agent) this.combo.break()
         if (target instanceof Enemy) {
           this.focus = { target, until: this.realFrame + 180 }
+          if (attacker.team === 'agent') this.combo.hit(this.realFrame)
           if (attacker.team === 'agent' || hit.hitsAllies) {
-            this.score += 10
+            this.score += HIT_SCORE * this.combo.multiplier
             if (wasAlive && target.life.isDead) {
               this.score += target.score
               this.sound('ko')
@@ -556,6 +567,7 @@ export class World {
       ctx.fill()
     }
     this.particles.draw(ctx, camX)
+    this.drawComboHint(ctx, camX)
     ctx.font = '8px "Press Start 2P", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'
@@ -570,6 +582,48 @@ export class World {
     if (this.debug) this.drawBoxes(ctx, camX)
     ctx.restore()
     drawHud(ctx, this)
+  }
+
+  /**
+   * 浮空連段的下一步按鍵提示：
+   * 挑空打中 → 跳；空中靠近浮空的敵人 → Z；第一記空中拳打中 → Z；第二記打中 → X。
+   */
+  comboHint(): ComboHint | null {
+    const agent = this.agent
+    const action = agent.action
+    if (action === MOVES.launcher) return agent.actionLanded ? 'jump' : null
+    if (action === MOVES.airPunch1) return agent.actionLanded ? 'punch' : null
+    if (action === MOVES.airPunch2) return agent.actionLanded ? 'kick' : null
+    if (agent.canAirAttack) {
+      const near = this.enemies.some(
+        (e) => e instanceof Grunt && e.juggled && Math.abs(e.x - agent.x) < 50 && Math.abs(e.h - agent.h) < 50,
+      )
+      if (near) return 'punch'
+    }
+    return null
+  }
+
+  /** 在特務頭上畫一個會上下跳動的鍵帽。 */
+  private drawComboHint(ctx: CanvasRenderingContext2D, camX: number): void {
+    const hint = this.comboHint()
+    if (!hint) return
+    const label = HINT_LABELS[hint]
+    const w = label.length > 1 ? 34 : 14
+    const x = this.agent.x - camX - w / 2
+    const y = GROUND_Y - this.agent.h - 72 - Math.abs(Math.sin(this.realFrame / 5)) * 4
+    ctx.fillStyle = '#1a1420'
+    ctx.beginPath()
+    ctx.roundRect(x - 1, y - 1, w + 2, 16, 3)
+    ctx.fill()
+    ctx.fillStyle = '#ffe36b'
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, 13, 2)
+    ctx.fill()
+    ctx.fillStyle = '#1a1420'
+    ctx.font = '7px "Press Start 2P", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, x + w / 2, y + 7)
   }
 
   private drawPickupPrompt(ctx: CanvasRenderingContext2D, camX: number): void {

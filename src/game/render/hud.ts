@@ -47,6 +47,34 @@ function drawClear(ctx: CanvasRenderingContext2D, world: World): void {
   }
 }
 
+/** 街機式連擊計數：大數字＋HITS，每次加一時跳一下；達門檻顯示評語與分數倍率。 */
+function drawCombo(ctx: CanvasRenderingContext2D, world: World): void {
+  const combo = world.combo
+  if (combo.count < 2) return
+  const age = world.realFrame - combo.bumpedAt
+  const pop = age < 8 ? 1 + (8 - age) * 0.04 : 1
+  const x = VIEW_W - 14
+  const y = 62
+
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(pop, pop)
+  ctx.font = '20px "Press Start 2P", monospace'
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'alphabetic'
+  const n = String(combo.count)
+  ctx.fillStyle = '#1a1420'
+  ctx.fillText(n, 2, 2)
+  ctx.fillStyle = combo.count >= 10 ? '#ff7a2f' : '#ffe36b'
+  ctx.fillText(n, 0, 0)
+  ctx.restore()
+
+  text(ctx, 'HITS', x, y + 4, 8, 'right')
+  const rating = combo.rating
+  if (rating) text(ctx, rating, x, y + 16, 8, 'right')
+  if (combo.multiplier > 1) text(ctx, `SCORE x${combo.multiplier}`, x, y + (rating ? 28 : 16), 6, 'right')
+}
+
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   // 淡色背景上白字不好讀：在上方資訊與下方操作說明後面墊一條半透明深色底
   ctx.fillStyle = 'rgba(20,16,24,0.45)'
@@ -71,6 +99,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     text(ctx, boss.label, x, VIEW_H - 34, 8)
     drawLifeBar(ctx, x, VIEW_H - 23, w, 7, boss.life)
   }
+
+  drawCombo(ctx, world)
 
   const banner = world.bossBanner
   if (banner && banner.until > world.realFrame) {

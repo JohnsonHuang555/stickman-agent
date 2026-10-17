@@ -51,7 +51,8 @@ function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
 if (import.meta.env.DEV && params.has('scene')) {
   const floor = Number(params.get('scene')) || 1
   const camX = Number(params.get('cam') ?? 300)
-  import('./dev/sceneGallery').then(({ sceneGallery }) => showStatic(sceneGallery(floor, camX)))
+  const combo = Number(params.get('combo') ?? 0)
+  import('./dev/sceneGallery').then(({ sceneGallery }) => showStatic(sceneGallery(floor, camX, combo)))
 } else if (import.meta.env.DEV && params.has('bosses')) {
   import('./dev/bossGallery').then(({ drawBossGallery }) => showStatic(drawBossGallery))
 } else if (import.meta.env.DEV && params.has('items')) {

@@ -67,14 +67,23 @@ describe('World simulation', () => {
     expect(grunt.life.max - grunt.life.hp).toBe(12)
   })
 
-  it('a punch cancelled by x within the window becomes the desperation move', () => {
+  it('pressing x while still holding z cancels the punch into the desperation move', () => {
     const { world, grunt } = arena()
+    tick(world, ['punch'])
+    run(world, 2, ['punch'])
+    tick(world, ['kick'], ['punch'])
+    run(world, 40)
+    expect(world.agent.life.hp).toBe(192)
+    expect(grunt.life.max - grunt.life.hp).toBe(12)
+  })
+
+  it('tapping z then x quickly is a punch followed by a kick, not the desperation move', () => {
+    const { world } = arena()
     tick(world, ['punch'])
     run(world, 2)
     tick(world, ['kick'])
     run(world, 40)
-    expect(world.agent.life.hp).toBe(192)
-    expect(grunt.life.max - grunt.life.hp).toBe(12)
+    expect(world.agent.life.hp).toBe(world.agent.life.max)
   })
 
   it('jumping leaves the ground and lands again', () => {
