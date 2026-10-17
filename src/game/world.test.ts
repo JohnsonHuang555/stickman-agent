@@ -264,3 +264,46 @@ describe('air control', () => {
     expect(behind.life.max - behind.life.hp).toBe(5)
   })
 })
+
+describe('plain jumping attacks (regression for "air punch goes slow-motion and ignores direction keys")', () => {
+  /** 跳起來後第 delay 幀按 pressed，回傳落地所需幀數與落地時的 x。 */
+  function jumpAndLand(pressed: Button[] | null, held: Button[] = [], delay = 4) {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump'], held)
+    let frames = 1
+    for (; frames < 120 && (frames < 3 || world.agent.h > 0); frames++) {
+      tick(world, frames === delay && pressed ? pressed : [], held)
+    }
+    return { frames, x: world.agent.x }
+  }
+
+  it('an air punch with nobody around does not make the agent hang in the air', () => {
+    const plain = jumpAndLand(null)
+    const punched = jumpAndLand(['punch'])
+    expect(punched.frames - plain.frames).toBeLessThanOrEqual(3)
+  })
+
+  it('direction keys pressed during an air punch still move the agent', () => {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump']) // 垂直起跳，沒有按方向
+    run(world, 3)
+    tick(world, ['punch'])
+    const x0 = world.agent.x
+    run(world, 12, ['right']) // 出拳之後才按 →
+    expect(world.agent.x - x0).toBeGreaterThan(15)
+  })
+
+  it('a whiffed air punch recovers quickly, so the agent can turn around before landing', () => {
+    const { world } = arena()
+    world.enemies = []
+    tick(world, ['jump'])
+    run(world, 3)
+    tick(world, ['punch'])
+    run(world, 12)
+    run(world, 2, ['left'])
+    expect(world.agent.airborne).toBe(true)
+    expect(world.agent.facing).toBe(-1)
+  })
+})

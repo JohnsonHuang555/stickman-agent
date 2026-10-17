@@ -28,6 +28,8 @@ const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pist
 const SEPARATION = 14
 /** 空中追擊時特務與浮空敵人之間的最小間距。 */
 const AIR_SPACING = 16
+/** 浮空的雜兵在這個水平距離內時，特務的空中招式才會懸停、收招拉長（空中連段輔助）。 */
+const JUGGLE_ASSIST_RANGE = 70
 /** 撿東西的距離。 */
 const PICKUP_REACH = 16
 const INTRO_FRAMES = 110
@@ -417,6 +419,13 @@ export class World {
 
   private get fighters(): Fighter[] {
     return [this.agent, ...this.enemies]
+  }
+
+  /** 這個位置附近有沒有正在浮空的雜兵（決定空中連段輔助要不要啟用）。 */
+  hasJuggledEnemyNear(x: number, h: number): boolean {
+    return this.enemies.some(
+      (e) => e instanceof Grunt && e.juggled && Math.abs(e.x - x) < JUGGLE_ASSIST_RANGE && Math.abs(e.h - h) < 70,
+    )
   }
 
   /**

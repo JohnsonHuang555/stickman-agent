@@ -19,6 +19,8 @@ const AGENT_GRAVITY = 0.36
 const AIR_DRIFT = 2.2
 /** 空中轉向時，每幀往目標速度靠近的比例。 */
 const AIR_STEER = 0.15
+/** 空中連段輔助：空中招式起手時往上帶的速度。 */
+const AIR_RISE = 1.4
 /** 招式輸入可被保留的幀數（讓頓幀或收招中的輸入不會被吃掉）。 */
 const COMMAND_BUFFER = 10
 const JUMP_BUFFER = 8
@@ -60,6 +62,8 @@ export class Agent extends Fighter {
   private crouching = false
   private walking = false
   private airAttackUsed = false
+  /** 附近有浮空的敵人：空中招式會懸停、往上帶（空中連段輔助）。 */
+  private juggleAssist = false
   /** 空中連段收招後的寬限期：這段時間內按 on 仍可接 next。 */
   private airChain: { next: MoveId; on: string; frames: number } | null = null
   private hitstun = 0
@@ -89,6 +93,7 @@ export class Agent extends Fighter {
     const now = world.realFrame
     this.stateFrame++
     this.animFrame++
+    this.juggleAssist = world.hasJuggledEnemyNear(this.x, this.h)
     if (this.invuln > 0) this.invuln--
     if (this.flash > 0) this.flash--
     if (this.airChain && --this.airChain.frames <= 0) this.airChain = null
@@ -169,6 +174,24 @@ export class Agent extends Fighter {
     act.frame++
     act.def.tick?.(this, act.frame, world)
 
+    const assist = act.def.airAssist
+    if (assist && this.airborne) {
+      if (assist.hover && this.juggleAssist) {
+        // 空中連段：出手那幾幀幾乎停在半空，收招時慢慢往下掉
+        this.vh = Math.max(this.vh, act.frame <= 6 ? -0.4 : -0.8)
+        this.vx *= 0.85
+      } else {
+        this.steerVelocity()
+      }
+      // 平常跳起來揮空：提早收招，馬上可以再動、轉向
+      const whiffed = !this.juggleAssist && act.hitIds.size === 0 && !act.chainQueued
+      if (assist.whiffEnd !== undefined && whiffed && act.frame >= assist.whiffEnd) {
+        this.act = null
+        this.setState('free')
+        return
+      }
+    }
+
     // 挑空技收招時按跳：直接起跳追擊
     if (act.def.jumpCancel !== undefined && act.frame >= act.def.jumpCancel && this.jumpUntil >= now && !this.airborne) {
       this.jumpUntil = -1
@@ -241,7 +264,12 @@ export class Agent extends Fighter {
     const dir = this.heldDir()
     if (!dir) return
     this.facing = dir
-    this.vx += (dir * AIR_DRIFT - this.vx) * AIR_STEER
+    this.steerVelocity(dir)
+  }
+
+  /** 只調整速度、不轉身（空中出招期間用）。 */
+  private steerVelocity(dir: -1 | 0 | 1 = this.heldDir()): void {
+    if (dir) this.vx += (dir * AIR_DRIFT - this.vx) * AIR_STEER
   }
 
   private startJump(dir: -1 | 0 | 1): void {
@@ -262,6 +290,8 @@ export class Agent extends Fighter {
     if (def.aerial && this.airborne && this.heldDir()) this.facing = this.heldDir() as Facing
     if (def.invuln) this.invuln = def.length
     def.onStart?.(this)
+    // 空中連段輔助：附近有浮空的敵人時，起手往上帶一點，跟著敵人一起升高
+    if (def.airAssist?.rise && this.juggleAssist) this.vh = Math.max(this.vh, AIR_RISE)
   }
 
   private onLand(): void {

@@ -68,6 +68,12 @@ export interface ActionDef {
   chain?: { accept: number; at: number; next: string; on?: string }
   /** 從這一幀起按跳可以取消收招直接起跳（挑空技接追擊用）。 */
   jumpCancel?: number
+  /**
+   * 空中連段輔助（只在附近有浮空的敵人時生效）：
+   * hover 出招期間幾乎停在半空、rise 起手時往上帶一點。
+   * 沒有輔助、又沒打中時，在 whiffEnd 幀提早收招，可以馬上恢復動作。
+   */
+  airAssist?: { hover?: boolean; rise?: boolean; whiffEnd?: number }
   /** 起手幾幀內可被 z+x 取消成保命招。 */
   cancelToDesperation?: boolean
   invuln?: boolean

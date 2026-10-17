@@ -10,17 +10,6 @@ const punchStep = (f: Fighter, frame: number) => {
   f.vx = frame >= 1 && frame <= 3 ? f.facing * 1 : 0
 }
 
-/** 空中出招：出手那幾幀幾乎停在半空，收招時慢慢往下掉（不會一直懸在空中）。 */
-const airHang = (f: Fighter, frame: number) => {
-  f.vh = Math.max(f.vh, frame <= 6 ? -0.4 : -0.8)
-  f.vx *= 0.85
-}
-
-/** 空中出拳時特務自己也往上帶一點，跟著被打上去的敵人一起升高。 */
-const airRise = (f: Fighter) => {
-  f.vh = Math.max(f.vh, 1.4)
-}
-
 /** 挑空技把雜兵打上空中的初速。 */
 // 搭配浮空上升重力 0.22：最高約 71px，接近特務跳躍的最高點
 export const LAUNCH_VELOCITY = 5.6
@@ -77,13 +66,13 @@ export const MOVES = {
   /** 空中連段：Z → Z → X。 */
   airPunch1: {
     clip: attackClip(ATTACK_POSES.airPunch1, 2, 3, 21, POSES.jumpFall),
-    // 收招拉長：接下一拳的空間比較寬；按得快的話照樣在第 6 幀就接上
+    // 收招長度只在空中連段時用得到（附近有浮空的敵人）：接下一拳的空間比較寬；
+    // 平常跳起來揮空會在第 10 幀提早收招，不會飄在空中
     length: 26,
     aerial: true,
     hit: { from: 2, to: 4, box: { forward: 2, up: -6, w: 28, h: 52 }, damage: 5, hitstun: 18, knockback: 0.6 },
     chain: { accept: 2, at: 6, next: 'airPunch2', on: 'airPunch' },
-    onStart: airRise,
-    tick: airHang,
+    airAssist: { hover: true, rise: true, whiffEnd: 10 },
   },
   airPunch2: {
     clip: attackClip(ATTACK_POSES.airPunch2, 2, 3, 23, POSES.jumpFall),
@@ -91,8 +80,7 @@ export const MOVES = {
     aerial: true,
     hit: { from: 2, to: 4, box: { forward: 2, up: -6, w: 28, h: 52 }, damage: 6, hitstun: 18, knockback: 0.6 },
     chain: { accept: 2, at: 6, next: 'airSpike', on: 'flyingKick' },
-    onStart: airRise,
-    tick: airHang,
+    airAssist: { hover: true, rise: true, whiffEnd: 10 },
   },
   airSpike: {
     clip: attackClip(ATTACK_POSES.airSpike, 3, 5, 8, POSES.jumpFall),
@@ -110,10 +98,7 @@ export const MOVES = {
       heavy: true,
       spike: true,
     },
-    onStart: airRise,
-    tick: (f, frame) => {
-      if (frame < 3) airHang(f, frame)
-    },
+    airAssist: { rise: true },
   },
   flyingKick: {
     clip: aerialClip(ATTACK_POSES.flyingKick, 2),
