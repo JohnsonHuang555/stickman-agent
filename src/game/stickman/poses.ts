@@ -45,7 +45,7 @@ export const POSES = {
  * 走路：不用關鍵影格，而是先決定腳踩在哪裡，再用反向運動學算出大腿與小腿的角度。
  * - 踩地的腳相對身體等速往後移，速度剛好等於前進速度 → 在地上完全不滑
  * - 抬起的腳畫一個小弧線往前跨
- * - 手跟腳反向擺動（前腳在前時前手在後）
+ * - 手維持護架，只跟著步伐小幅晃動
  * 動畫依實際走過的距離播放，走得慢的敵人腳步也跟著變慢。
  */
 /** 一個循環（兩步）前進的距離。 */
@@ -55,8 +55,8 @@ const STEP_HALF = WALK_CYCLE_DISTANCE / 4
 /** 支撐腳伸到腿長的這個比例：經過身體正下方時腿幾乎打直，骨盆因此自然上下起伏。 */
 const STANCE_REACH = 0.97
 const SWING_LIFT = 6
-const ARM_SWING = 25
-const ELBOW_BEND = 50
+/** 走路時護架跟著步伐晃動的角度。 */
+const GUARD_SWAY = 6
 
 /** 兩段式腿的反向運動學：骨盆到腳的位置 (x 朝前, y 朝下) → [大腿, 小腿] 角度，膝蓋往前彎。 */
 function legIK(fx: number, fy: number): Limb {
@@ -86,9 +86,10 @@ export function walkPose(stride: number): Pose {
   const stance = front.lift === 0 ? front : back
   const reach = (BODY.thigh + BODY.shin) * STANCE_REACH
   const hip = Math.sqrt(Math.max(0, reach * reach - stance.x * stance.x))
-  const swing = Math.cos(phase * Math.PI * 2) * ARM_SWING
-  const armF: Limb = [-swing, -swing + ELBOW_BEND]
-  const armB: Limb = [swing, swing + ELBOW_BEND]
+  // 手維持護架（和站姿一樣），只跟著步伐小幅晃動，不放下來
+  const sway = Math.cos(phase * Math.PI * 2) * GUARD_SWAY
+  const armF: Limb = [GUARD_F[0] - sway, GUARD_F[1] - sway]
+  const armB: Limb = [GUARD_B[0] + sway, GUARD_B[1] + sway]
   return P(8, armF, armB, legIK(front.x, hip - front.lift), legIK(back.x, hip - back.lift))
 }
 

@@ -45,13 +45,13 @@ describe('walk (regression for "arm swing looks unnatural" and feet sliding)', (
     }
   })
 
-  it('arms swing opposite to the legs', () => {
-    for (const stride of [0, WALK_CYCLE_DISTANCE / 2]) {
-      const p = walkPose(stride)
-      const legs = Math.sign(p.legF[0] - p.legB[0])
-      const arms = Math.sign(p.armF[0] - p.armB[0])
-      expect(legs).not.toBe(0)
-      expect(arms).toBe(-legs)
+  it('hands stay up in the guard the whole time (regression for "arms dropping while walking")', () => {
+    const idle = posePoints(POSES.idleA)
+    const chest = idle[1][1] * 0.75 // 站姿頸部高度的 75%
+    for (const stride of samples) {
+      const pts = posePoints(walkPose(stride))
+      expect(pts[3][1]).toBeGreaterThan(chest) // 前手
+      expect(pts[5][1]).toBeGreaterThan(chest) // 後手
     }
   })
 
