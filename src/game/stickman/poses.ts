@@ -139,11 +139,16 @@ export function attackClip(
   ])
 }
 
-/** 空中動作：預備後保持出手姿勢直到落地。 */
+/**
+ * 空中動作：預備後保持出手姿勢直到落地。
+ * 出手那一格的長度要和補間幀數相同，播完時才會完全到位
+ * （之前是 1 幀配 2 幀補間，結果永遠卡在補間 75% 的半成品姿勢）。
+ */
 export function aerialClip([windup, strike]: readonly Pose[], windupFrames: number): Clip {
+  const strikeBlend = 2
   return new Clip([
     { pose: windup, dur: windupFrames, blend: 2 },
-    { pose: strike, dur: 1, blend: 2 },
+    { pose: strike, dur: strikeBlend, blend: strikeBlend },
   ])
 }
 
