@@ -23,6 +23,22 @@ export function normalizeNickname(raw: string): string | null {
   return name.length ? name : null
 }
 
+/** 同一個暱稱算同一個人（不分大小寫）。 */
+export function nicknameKey(nickname: string): string {
+  return nickname.trim().toLowerCase()
+}
+
+/** 每個暱稱只留最好的一筆（排行榜不重複列出同一個人）。 */
+export function bestPerNickname(entries: readonly LeaderboardEntry[]): LeaderboardEntry[] {
+  const best = new Map<string, LeaderboardEntry>()
+  for (const e of entries) {
+    const key = nicknameKey(e.nickname)
+    const prev = best.get(key)
+    if (!prev || compareEntries(e, prev) < 0) best.set(key, e)
+  }
+  return [...best.values()].sort(compareEntries)
+}
+
 export function floorLabel(floor: number): string {
   return floor >= CLEARED_FLOOR ? 'CLEAR' : `${floor}F`
 }
@@ -46,7 +62,8 @@ export class LocalLeaderboard implements Leaderboard {
   constructor(private readonly store: KeyValueStore | null = safeLocalStorage()) {}
 
   async submit(entry: LeaderboardEntry): Promise<void> {
-    const entries = [...this.read(), entry].sort(compareEntries).slice(0, KEEP)
+    // 同一個暱稱只留最好的成績：破紀錄才會取代原本那筆
+    const entries = bestPerNickname([...this.read(), entry]).slice(0, KEEP)
     try {
       this.store?.setItem(STORAGE_KEY, JSON.stringify(entries))
     } catch {
@@ -55,7 +72,7 @@ export class LocalLeaderboard implements Leaderboard {
   }
 
   async top(limit: number): Promise<LeaderboardEntry[]> {
-    return this.read().sort(compareEntries).slice(0, limit)
+    return bestPerNickname(this.read()).slice(0, limit)
   }
 
   private read(): LeaderboardEntry[] {

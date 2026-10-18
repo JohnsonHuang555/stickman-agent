@@ -11,9 +11,9 @@ function memoryStore() {
 
 /** 假的 fetch：記錄每次請求，回傳指定的 JSON。 */
 function fakeFetch(reply: unknown = {}, status = 200) {
-  const calls: { url: string; body: any }[] = []
+  const calls: { url: string; method?: string; body: any }[] = []
   const fn = async (url: string, init?: RequestInit) => {
-    calls.push({ url, body: JSON.parse(String(init?.body)) })
+    calls.push({ url, method: init?.method, body: JSON.parse(String(init?.body)) })
     return new Response(JSON.stringify(reply), { status })
   }
   return { fn, calls }
@@ -33,12 +33,13 @@ const doc = (e: LeaderboardEntry) => ({
 })
 
 describe('FirestoreLeaderboard', () => {
-  it('submits a new document to the scores collection with typed fields', async () => {
+  it('writes one document per nickname (lower-cased id) with typed fields, overwriting via PATCH', async () => {
     const { fn, calls } = fakeFetch()
     await new FirestoreLeaderboard(CONFIG, fn).submit(entry('AGENT', 3, 12345, 99))
     expect(calls[0].url).toBe(
-      'https://firestore.googleapis.com/v1/projects/stickman-test/databases/(default)/documents/scores?key=KEY123',
+      'https://firestore.googleapis.com/v1/projects/stickman-test/databases/(default)/documents/scores/agent?key=KEY123',
     )
+    expect(calls[0].method).toBe('PATCH')
     expect(calls[0].body).toEqual({
       fields: {
         nickname: { stringValue: 'AGENT' },
@@ -54,9 +55,19 @@ describe('FirestoreLeaderboard', () => {
     const { fn, calls } = fakeFetch(rows)
     const top = await new FirestoreLeaderboard(CONFIG, fn).top(20)
     expect(calls[0].url).toContain('/documents:runQuery?key=KEY123')
-    expect(calls[0].body.structuredQuery.limit).toBe(20)
+    expect(calls[0].body.structuredQuery.limit).toBe(50) // 多抓一些再去掉重複暱稱（上限 50）
     expect(calls[0].body.structuredQuery.orderBy.map((o: any) => o.field.fieldPath)).toEqual(['floor', 'score', 'at'])
     expect(top.map((e) => e.nickname)).toEqual(['A', 'C', 'B'])
+  })
+
+  it('shows each nickname once, keeping the best (old data may have duplicates)', async () => {
+    const rows = [doc(entry('Bob', 2, 900)), doc(entry('bob', 3, 100)), doc(entry('BOB', 2, 5000)), doc(entry('Amy', 1, 50))]
+    const { fn } = fakeFetch(rows)
+    const top = await new FirestoreLeaderboard(CONFIG, fn).top(10)
+    expect(top.map((e) => [e.nickname, e.floor, e.score])).toEqual([
+      ['bob', 3, 100],
+      ['Amy', 1, 50],
+    ])
   })
 
   it('throws on an HTTP error so the caller can fall back', async () => {

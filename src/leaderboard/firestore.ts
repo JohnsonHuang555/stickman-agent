@@ -1,8 +1,9 @@
-import { NICKNAME_MAX, compareEntries, type Leaderboard, type LeaderboardEntry } from './leaderboard'
+import { NICKNAME_MAX, bestPerNickname, nicknameKey, type Leaderboard, type LeaderboardEntry } from './leaderboard'
 
 /**
  * 線上排行榜：直接呼叫 Firestore REST API（不載入 Firebase SDK，遊戲檔案不會變大）。
- * 寫入格式由 firestore.rules 把關：只能新增、欄位與數值範圍固定，不能修改或刪除。
+ * 每個暱稱一份文件（文件 ID = 小寫暱稱）：寫入時整份覆蓋，firestore.rules 只允許「比原本好」的成績覆蓋，
+ * 所以排行榜上同一個人只會有最高的那筆。
  */
 export interface FirestoreConfig {
   projectId: string
@@ -10,6 +11,9 @@ export interface FirestoreConfig {
 }
 
 export const SCORES_COLLECTION = 'scores'
+/** 讀取時多抓一些再去掉重複的暱稱（舊資料可能有同名的多筆）；Firestore 規則上限 50。 */
+const QUERY_HEADROOM = 3
+const QUERY_MAX = 50
 /** 單次請求最多等這麼久，網路不好時不會卡住排行榜畫面。 */
 const TIMEOUT_MS = 5000
 
@@ -39,7 +43,9 @@ export class FirestoreLeaderboard implements Leaderboard {
         at: { integerValue: String(Math.round(entry.at)) },
       },
     }
-    await this.request(`${this.base}/${SCORES_COLLECTION}?key=${this.config.apiKey}`, body)
+    // PATCH 到固定的文件：沒有就建立，有就覆蓋（不比原本好的會被規則擋下來，視為失敗即可）
+    const id = encodeURIComponent(nicknameKey(entry.nickname))
+    await this.request(`${this.base}/${SCORES_COLLECTION}/${id}?key=${this.config.apiKey}`, body, 'PATCH')
   }
 
   async top(limit: number): Promise<LeaderboardEntry[]> {
@@ -52,25 +58,22 @@ export class FirestoreLeaderboard implements Leaderboard {
           { field: { fieldPath: 'score' }, direction: 'DESCENDING' },
           { field: { fieldPath: 'at' }, direction: 'ASCENDING' },
         ],
-        limit,
+        limit: Math.min(QUERY_MAX, limit * QUERY_HEADROOM),
       },
     }
     const rows = (await this.request(`${this.base}:runQuery?key=${this.config.apiKey}`, query)) as {
       document?: { fields?: Record<string, FirestoreValue> }
     }[]
-    return rows
-      .map((row) => toEntry(row.document?.fields))
-      .filter((e): e is LeaderboardEntry => e !== null)
-      .sort(compareEntries)
-      .slice(0, limit)
+    const entries = rows.map((row) => toEntry(row.document?.fields)).filter((e): e is LeaderboardEntry => e !== null)
+    return bestPerNickname(entries).slice(0, limit)
   }
 
-  private async request(url: string, body: unknown): Promise<unknown> {
+  private async request(url: string, body: unknown, method: 'POST' | 'PATCH' = 'POST'): Promise<unknown> {
     const controller = typeof AbortController === 'undefined' ? null : new AbortController()
     const timer = controller ? setTimeout(() => controller.abort(), TIMEOUT_MS) : null
     try {
       const res = await this.fetchFn(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         signal: controller?.signal,

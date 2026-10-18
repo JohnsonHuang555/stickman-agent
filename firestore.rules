@@ -1,24 +1,34 @@
 rules_version = '2';
 
-// 排行榜：任何人都能讀；只能新增格式正確的成績，不能修改或刪除。
+// 排行榜：任何人都能讀；每個暱稱一份文件（ID = 小寫暱稱）。
+// 第一次寫入是新增；之後只有「到達樓層更高，或同樓層分數更高」才能覆蓋，不能刪除。
 service cloud.firestore {
   match /databases/{database}/documents {
+    function validScore(d) {
+      return d.keys().hasOnly(['nickname', 'floor', 'score', 'at'])
+        && d.keys().hasAll(['nickname', 'floor', 'score', 'at'])
+        && d.nickname is string
+        && d.nickname.size() >= 1
+        && d.nickname.size() <= 12
+        && d.floor is int
+        && d.floor >= 1
+        && d.floor <= 4
+        && d.score is int
+        && d.score >= 0
+        && d.score <= 9999999
+        && d.at is int;
+    }
+
+    function beats(next, prev) {
+      return next.floor > prev.floor || (next.floor == prev.floor && next.score > prev.score);
+    }
+
     match /scores/{scoreId} {
       allow list: if request.query.limit <= 50;
       allow get: if true;
-      allow create: if request.resource.data.keys().hasOnly(['nickname', 'floor', 'score', 'at'])
-        && request.resource.data.keys().hasAll(['nickname', 'floor', 'score', 'at'])
-        && request.resource.data.nickname is string
-        && request.resource.data.nickname.size() >= 1
-        && request.resource.data.nickname.size() <= 12
-        && request.resource.data.floor is int
-        && request.resource.data.floor >= 1
-        && request.resource.data.floor <= 4
-        && request.resource.data.score is int
-        && request.resource.data.score >= 0
-        && request.resource.data.score <= 9999999
-        && request.resource.data.at is int;
-      allow update, delete: if false;
+      allow create: if validScore(request.resource.data);
+      allow update: if validScore(request.resource.data) && beats(request.resource.data, resource.data);
+      allow delete: if false;
     }
   }
 }
