@@ -3,7 +3,8 @@ import type { Theme } from '../level/floors'
 
 /**
  * 扁平插畫風背景：大塊扁平色塊與柔和漸層、淡色低對比，不畫小細節，讓角色成為畫面焦點。
- * 每層樓只靠色調與幾個大形狀區分：1F 暖米色大廳、2F 淡玫瑰色賭場、3F 黃昏天空的頂樓。
+ * 每層樓用不同主色一眼區分：1F 白天的暖沙色大廳、2F 夜晚的翡翠綠賭場（金色柱子、綠絨地板）、
+ * 3F 冷藍夜景的頂樓。顏色都避開角色色（特務黑、Ryu 深紅、Johnson 金），角色才看得清楚。
  */
 const CEILING = 20
 
@@ -26,46 +27,46 @@ interface Palette {
 
 const PALETTES: Record<Theme, Palette> = {
   lobby: {
-    ceiling: '#d9ccb4',
-    wallTop: '#f3ebdc',
-    wallBottom: '#e8dcc6',
-    sky: ['#cfe0ee', '#eef2f0'],
-    cityFar: '#c3d3e2',
-    cityNear: '#adc0d3',
-    frame: '#c9b99c',
-    pillar: '#e6dac4',
-    pillarShade: '#d8caaf',
-    floorTop: '#d6c8ae',
-    floorBottom: '#bfae91',
-    floorLine: '#a8977a',
+    ceiling: '#d8bf94',
+    wallTop: '#f5e6c8',
+    wallBottom: '#ead4ac',
+    sky: ['#9fcbea', '#e3f1f7'],
+    cityFar: '#b7d2e6',
+    cityNear: '#9dbcd6',
+    frame: '#c8a978',
+    pillar: '#ebd5ad',
+    pillarShade: '#dcc095',
+    floorTop: '#d9bf92',
+    floorBottom: '#bf9f6e',
+    floorLine: '#a3845a',
   },
   casino: {
-    ceiling: '#c99aa0',
-    wallTop: '#f2dcdc',
-    wallBottom: '#e8c8ca',
-    sky: ['#f0c9d2', '#f7e4e2'],
-    cityFar: '#e2b3bd',
-    cityNear: '#d29cab',
-    frame: '#c98f98',
-    pillar: '#e6bfc3',
-    pillarShade: '#d9aab0',
-    floorTop: '#cf9aa2',
-    floorBottom: '#b47c86',
-    floorLine: '#9c6670',
+    ceiling: '#3f6f5f',
+    wallTop: '#cde6da',
+    wallBottom: '#acd2c1',
+    sky: ['#3b3a6e', '#7a6aa0'],
+    cityFar: '#6a5f93',
+    cityNear: '#564c7d',
+    frame: '#c9a85a',
+    pillar: '#e2c987',
+    pillarShade: '#ccb06a',
+    floorTop: '#4f8f74',
+    floorBottom: '#356a55',
+    floorLine: '#2a5644',
   },
   office: {
-    ceiling: '#8f86a8',
-    wallTop: '#ece2da',
-    wallBottom: '#e0d3c8',
-    sky: ['#b9add6', '#f6c9a6'],
-    cityFar: '#a99fc6',
-    cityNear: '#8b81ab',
-    frame: '#9a8fae',
-    pillar: '#d9cdc6',
-    pillarShade: '#cbbdb5',
-    floorTop: '#cbbcb0',
-    floorBottom: '#ae9d90',
-    floorLine: '#958478',
+    ceiling: '#5c6c92',
+    wallTop: '#dde3ef',
+    wallBottom: '#c7d0e2',
+    sky: ['#34457a', '#93a7d8'],
+    cityFar: '#7c8fc0',
+    cityNear: '#5f72a6',
+    frame: '#6f7ea3',
+    pillar: '#cfd7e6',
+    pillarShade: '#bcc6da',
+    floorTop: '#b4bfd4',
+    floorBottom: '#919eb8',
+    floorLine: '#76839e',
   },
 }
 
@@ -99,7 +100,7 @@ function city(ctx: CanvasRenderingContext2D, camX: number, parallax: number, bas
   })
 }
 
-/** 窗外景色：天空漸層＋兩層城市剪影（3F 另加夕陽）。 */
+/** 窗外景色：天空漸層＋兩層城市剪影（3F 另加月亮）。 */
 function view(ctx: CanvasRenderingContext2D, p: Palette, theme: Theme, x: number, y: number, w: number, h: number, camX: number): void {
   ctx.save()
   ctx.beginPath()
@@ -108,9 +109,17 @@ function view(ctx: CanvasRenderingContext2D, p: Palette, theme: Theme, x: number
   ctx.fillStyle = vGradient(ctx, y, y + h, p.sky[0], p.sky[1])
   ctx.fillRect(x, y, w, h)
   if (theme === 'office') {
-    ctx.fillStyle = 'rgba(255,226,180,0.9)'
+    // 月亮：淡淡的光暈＋圓
+    const mx = 360 - camX * 0.04
+    const my = y + h * 0.3
+    const glow = ctx.createRadialGradient(mx, my, 0, mx, my, 40)
+    glow.addColorStop(0, 'rgba(240,244,255,0.35)')
+    glow.addColorStop(1, 'rgba(240,244,255,0)')
+    ctx.fillStyle = glow
+    ctx.fillRect(mx - 40, my - 40, 80, 80)
+    ctx.fillStyle = 'rgba(244,246,255,0.95)'
     ctx.beginPath()
-    ctx.arc(360 - camX * 0.04, y + h * 0.62, 18, 0, Math.PI * 2)
+    ctx.arc(mx, my, 13, 0, Math.PI * 2)
     ctx.fill()
   }
   city(ctx, camX, 0.15, y + h, h * 0.6, p.cityFar, 7)
@@ -156,7 +165,7 @@ function lobby(ctx: CanvasRenderingContext2D, p: Palette, camX: number): void {
   floor(ctx, p)
 }
 
-/** 2F：拱形窗與幾個柔和的大圓形燈。 */
+/** 2F：拱形窗（窗外夜空）、金色柱子與幾個柔和的大圓形燈。 */
 function casino(ctx: CanvasRenderingContext2D, p: Palette, camX: number, t: number): void {
   wall(ctx, p)
   repeat(camX, 260, 0.7, (x) => {
@@ -185,7 +194,7 @@ function casino(ctx: CanvasRenderingContext2D, p: Palette, camX: number, t: numb
   floor(ctx, p)
 }
 
-/** 3F：整面落地窗，窗外黃昏與城市剪影。 */
+/** 3F：整面落地窗，窗外冷藍夜景與城市剪影。 */
 function office(ctx: CanvasRenderingContext2D, p: Palette, camX: number): void {
   wall(ctx, p)
   const windowH = 140
@@ -197,9 +206,9 @@ function office(ctx: CanvasRenderingContext2D, p: Palette, camX: number): void {
   // 魔王的大辦公桌：單色剪影
   const desk = 1300 - camX
   if (desk > -100 && desk < VIEW_W + 100) {
-    ctx.fillStyle = '#b3a296'
+    ctx.fillStyle = '#8e9aba'
     ctx.fillRect(desk - 16, GROUND_Y - 56, 32, 28)
-    ctx.fillStyle = '#9e8c80'
+    ctx.fillStyle = '#7a87a8'
     ctx.fillRect(desk - 50, GROUND_Y - 30, 100, 8)
     ctx.fillRect(desk - 46, GROUND_Y - 22, 18, 22)
     ctx.fillRect(desk + 28, GROUND_Y - 22, 18, 22)
