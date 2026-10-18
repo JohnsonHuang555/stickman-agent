@@ -20,10 +20,8 @@ import { Crate } from './level/crate'
 import { ZoneDirector } from './level/zoneDirector'
 import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
-import { GHOST_EVERY, ImpactFx } from './render/impact'
+import { ImpactFx } from './render/impact'
 import { Particles } from './render/particles'
-import { MOVES } from './agent/moves'
-import type { ActionDef } from './combat/types'
 
 const TRAINING_GRUNTS = 3
 const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pistol', 'shotgun', 'chair', 'cabinet']
@@ -42,14 +40,6 @@ const HIT_SCORE = 10
 /** 被打飛撞到牆時的額外傷害。 */
 const WALL_BOUNCE_DAMAGE = 6
 const MUZZLE_FRAMES = 5
-/** 會留下殘影的特務招式（快、重的動作）。 */
-const GHOST_MOVES: ReadonlySet<ActionDef> = new Set<ActionDef>([
-  MOVES.flyingKick, MOVES.dashPunch, MOVES.diveSmash, MOVES.airSpike, MOVES.punch3,
-  MOVES.launcher, MOVES.roll, MOVES.desperation, MOVES.sweep,
-])
-/** 敵人移動得比這快（被打飛、衝刺）就留殘影。 */
-const GHOST_SPEED = 2.3
-const GHOST_COLOR = { agent: '#4a78c0', gang: '#c0504a' } as const
 /** 打倒區段最後一個敵人／魔王：慢動作長度（實際幀數）與速度（每幾幀推進一次）。 */
 const FINISH_SLOWMO_FRAMES = 60
 const SLOWMO_RATE = 3
@@ -243,7 +233,6 @@ export class World {
     for (const i of this.items) i.update(this)
     for (const b of this.bullets) b.update(this)
     this.particles.update()
-    this.recordGhosts()
     this.combo.update(this.realFrame)
     this.separateGrunts()
     this.keepAirSpacing()
@@ -529,29 +518,6 @@ export class World {
     return this.enemies.every((e) => e === target || e.isGone || e.life.isDead)
   }
 
-  /** 快、重的動作留下殘影。 */
-  private recordGhosts(): void {
-    if (this.floorFrames % GHOST_EVERY !== 0) return
-    const move = this.agent.currentMove
-    const fast = (f: Fighter) => (f === this.agent ? !!move && GHOST_MOVES.has(move) : Math.abs(f.vx) >= GHOST_SPEED)
-    for (const f of this.fighters) {
-      if (!fast(f) || f.alpha < 1) continue
-      this.fx.ghost(
-        {
-          pose: f.pose(),
-          x: f.x,
-          footY: GROUND_Y - f.h,
-          facing: f.facing,
-          scale: f.scale,
-          rotation: f.rotation,
-          grounded: f.h === 0,
-          color: GHOST_COLOR[f.team],
-        },
-        this.realFrame,
-      )
-    }
-  }
-
   /** 被打飛的雜兵撞到牆：額外受傷、震動畫面、牆邊揚起碎屑，算一次連擊。 */
   wallBounce(g: Grunt, side: Facing): void {
     const wasAlive = !g.life.isDead
@@ -742,7 +708,6 @@ export class World {
     for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)
-    this.fx.drawGhosts(ctx, camX, this.realFrame)
     for (const g of this.enemies) g.draw(ctx, camX)
     this.agent.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'flying') i.draw(ctx, camX)

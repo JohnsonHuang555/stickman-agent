@@ -435,11 +435,6 @@ export class Agent extends Fighter {
     return this.state === 'down' && this.life.isDead && this.stateFrame > 60
   }
 
-  /** 正在出的招式；沒有出招時為 null。 */
-  get currentMove(): ActionDef | null {
-    return this.state === 'action' ? (this.act?.def ?? null) : null
-  }
-
   /** 正在做低姿勢的動作（蹲拳、掃腿、翻滾）：受擊框維持蹲姿高度。 */
   private get lowAction(): boolean {
     const def = this.act?.def

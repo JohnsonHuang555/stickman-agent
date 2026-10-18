@@ -1,11 +1,7 @@
 import { GROUND_Y, VIEW_H, VIEW_W } from '../constants'
-import { drawStickman, spinPivot, type Palette, type Pose } from '../stickman/pose'
 
 /** 打中瞬間的衝擊閃光持續幀數（輕擊／重擊）。 */
 export const SPARK_FRAMES = { light: 7, heavy: 12 } as const
-/** 殘影：每幾幀留一個、每個留多久。 */
-export const GHOST_EVERY = 2
-export const GHOST_FRAMES = 10
 /** 鏡頭推近：拉近、停住、拉回的總長度與放大倍率。 */
 export const ZOOM_IN_FRAMES = 4
 export const ZOOM_OUT_FRAMES = 10
@@ -21,19 +17,6 @@ export interface Spark {
   dir: 1 | -1
 }
 
-/** 殘影：某一幀的姿勢與位置。 */
-export interface Ghost {
-  pose: Pose
-  x: number
-  footY: number
-  facing: 1 | -1
-  scale: number
-  rotation: number
-  grounded: boolean
-  color: string
-  born: number
-}
-
 interface Zoom {
   x: number
   y: number
@@ -43,22 +26,17 @@ interface Zoom {
 }
 
 /**
- * 打擊演出（純畫面，不影響判定）：衝擊閃光、殘影、鏡頭推近、全畫面閃白。
+ * 打擊演出（純畫面，不影響判定）：衝擊閃光、鏡頭推近、全畫面閃白。
  * 時間一律用 realFrame 算，頓幀和慢動作期間閃光照樣播完。
  */
 export class ImpactFx {
   sparks: Spark[] = []
-  ghosts: Ghost[] = []
   zoom: Zoom | null = null
   private whiteUntil = -1
   private whiteBorn = 0
 
   spark(x: number, y: number, heavy: boolean, hurt: boolean, dir: 1 | -1, frame: number): void {
     this.sparks.push({ x, y, heavy, hurt, dir, born: frame })
-  }
-
-  ghost(g: Omit<Ghost, 'born'>, frame: number): void {
-    this.ghosts.push({ ...g, born: frame })
   }
 
   /** 鏡頭往 (x, y) 推近；已經在推近時取比較強的那個。 */
@@ -75,7 +53,6 @@ export class ImpactFx {
 
   update(frame: number): void {
     this.sparks = this.sparks.filter((s) => frame - s.born < (s.heavy ? SPARK_FRAMES.heavy : SPARK_FRAMES.light))
-    this.ghosts = this.ghosts.filter((g) => frame - g.born < GHOST_FRAMES)
     if (this.zoom && frame - this.zoom.born >= ZOOM_IN_FRAMES + this.zoom.hold + ZOOM_OUT_FRAMES) this.zoom = null
   }
 
@@ -103,26 +80,6 @@ export class ImpactFx {
     ctx.translate(fx, fy)
     ctx.scale(amount, amount)
     ctx.translate(-fx, -fy)
-  }
-
-  drawGhosts(ctx: CanvasRenderingContext2D, camX: number, frame: number): void {
-    for (const g of this.ghosts) {
-      const t = 1 - (frame - g.born) / GHOST_FRAMES
-      if (t <= 0) continue
-      const palette: Palette = { body: g.color, back: g.color }
-      const x = g.x - camX
-      ctx.save()
-      ctx.globalAlpha = 0.32 * t
-      if (g.rotation) {
-        const { pivotX, pivotY, lift } = spinPivot(g.pose, x, g.footY, g.facing, g.scale, g.rotation, g.grounded)
-        ctx.translate(0, -lift)
-        ctx.translate(pivotX, pivotY)
-        ctx.rotate(g.rotation)
-        ctx.translate(-pivotX, -pivotY)
-      }
-      drawStickman(ctx, g.pose, x, g.footY, g.facing, palette, g.scale)
-      ctx.restore()
-    }
   }
 
   drawSparks(ctx: CanvasRenderingContext2D, camX: number, frame: number): void {

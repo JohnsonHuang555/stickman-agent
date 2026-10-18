@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { MOVES } from './agent/moves'
 import { VIEW_W } from './constants'
 import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
@@ -64,33 +63,6 @@ describe('impact sparks', () => {
       hurt = world.fx.sparks.some((s) => s.hurt)
     }
     expect(hurt).toBe(true)
-  })
-})
-
-describe('afterimages', () => {
-  it('a dash punch leaves fading afterimages; plain walking does not', () => {
-    const world = new World({ mode: 'sandbox' })
-    world.enemies = []
-    run(world, 30, ['right'])
-    expect(world.fx.ghosts).toHaveLength(0)
-    run(world, 20)
-    tick(world, ['right'])
-    run(world, 2)
-    tick(world, ['right'])
-    tick(world, ['punch'])
-    run(world, 6)
-    expect(world.agent.currentMove).toBe(MOVES.dashPunch)
-    expect(world.fx.ghosts.length).toBeGreaterThan(0)
-    run(world, 40)
-    expect(world.fx.ghosts).toHaveLength(0)
-  })
-
-  it('an enemy knocked flying leaves afterimages', () => {
-    const { world, grunt } = arena()
-    grunt.receiveHit({ from: 0, to: 0, box: { forward: 0, up: 0, w: 1, h: 1 }, damage: 1, hitstun: 20, knockback: 4, knockdown: true }, 1, world)
-    grunt.vx = 4
-    run(world, 4)
-    expect(world.fx.ghosts.some((g) => g.color !== '#4a78c0')).toBe(true)
   })
 })
 
