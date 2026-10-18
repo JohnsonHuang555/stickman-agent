@@ -57,8 +57,8 @@ const isStandalone = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true
 
 /**
- * 手機每次觸碰：解鎖音效；還不是全螢幕就嘗試切換並鎖定橫向。
- * 瀏覽器只允許在使用者觸碰時切換全螢幕，所以轉成橫向後要點一下畫面；iOS Safari 不支援（請用「加入主畫面」）。
+ * 手機每次手指放開：解鎖音效；還不是全螢幕就嘗試切換並鎖定橫向。
+ * 瀏覽器只允許在手指放開（touchend）時切換全螢幕，所以轉成橫向後要點一下畫面；iPhone Safari 不支援（請用「加入主畫面」）。
  */
 function enterMobileMode(): void {
   unlockAudio()
@@ -78,12 +78,13 @@ function enterMobileMode(): void {
 
 /** 橫向、還沒全螢幕、而且這台瀏覽器可以全螢幕時，上方顯示「點一下畫面即可全螢幕」。 */
 function updateFullscreenHint(): void {
-  const show =
-    document.body.classList.contains('touch') &&
-    innerWidth > innerHeight &&
-    document.fullscreenEnabled &&
-    !document.fullscreenElement &&
-    !isStandalone()
+  const hint = document.getElementById('fs-hint')
+  const landscapeTouch = document.body.classList.contains('touch') && innerWidth > innerHeight && !isStandalone()
+  // iPhone 的 Safari 不能讓網頁全螢幕：改成教玩家「加入主畫面」
+  const iPhone = /iPhone|iPod/.test(navigator.userAgent)
+  const canTap = !!document.fullscreenEnabled && !document.fullscreenElement
+  const show = landscapeTouch && (iPhone || canTap)
+  if (hint) hint.textContent = iPhone ? 'iPhone 全螢幕：分享 → 加入主畫面，從主畫面開啟' : '點一下畫面即可全螢幕'
   document.body.classList.toggle('fs-hint', show)
 }
 

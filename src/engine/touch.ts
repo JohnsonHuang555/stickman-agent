@@ -62,7 +62,10 @@ export class TouchControls {
   private readonly base: HTMLDivElement
   private readonly knob: HTMLDivElement
 
-  /** onTouch：每次手指按下時呼叫（瀏覽器只允許在使用者觸碰時切換全螢幕）。 */
+  /**
+   * onTouch：每次手指放開時呼叫。瀏覽器只把「手指放開（touchend）」當成允許全螢幕、播放聲音的使用者操作，
+   * 手指按下（touchstart）不算，在那時候要求全螢幕會被默默拒絕。
+   */
   constructor(onTouch?: () => void) {
     document.body.classList.add('touch')
     this.root = document.createElement('div')
@@ -80,7 +83,6 @@ export class TouchControls {
       'touchstart',
       (e) => {
         e.preventDefault()
-        onTouch?.()
         for (const t of Array.from(e.changedTouches)) this.touchStart(t)
       },
       opts,
@@ -97,7 +99,10 @@ export class TouchControls {
       e.preventDefault()
       for (const t of Array.from(e.changedTouches)) this.touchEnd(t)
     }
-    this.root.addEventListener('touchend', end, opts)
+    this.root.addEventListener('touchend', (e) => {
+      end(e)
+      onTouch?.()
+    }, opts)
     this.root.addEventListener('touchcancel', end, opts)
   }
 
