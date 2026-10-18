@@ -1,4 +1,6 @@
-/** 遊戲音效，全部用 Web Audio 即時合成，不需要音檔。 */
+/**
+ * 遊戲音效：有音檔（public/sfx/*.mp3）的用音檔，沒有的（或還沒載入、載入失敗）用 Web Audio 即時合成。
+ */
 export type Sound =
   | 'hit'
   | 'heavyHit'
@@ -17,6 +19,28 @@ export type Sound =
   | 'gameOver'
   | 'menu'
   | 'select'
+
+/**
+ * 有音檔的音效與檔名（public/sfx/<檔名>.mp3）。之後放進新的音檔，在這裡加一行即可。
+ * 沒列在這裡的音效一律用合成音。
+ */
+const SOUND_FILES: Partial<Record<Sound, string>> = {
+  hit: 'hit',
+  heavyHit: 'heavy-hit',
+  hurt: 'hurt',
+  shot: 'shot',
+  shotgun: 'shotgun',
+  click: 'click',
+  throw: 'throw',
+  break: 'break',
+  pickup: 'pickup',
+  heal: 'heal',
+  coin: 'coin',
+}
+
+/** 已經解碼好的音檔。 */
+const buffers = new Map<Sound, AudioBuffer>()
+let loadStarted = false
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -37,9 +61,39 @@ export function unlockAudio(): void {
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
     }
     if (ctx.state === 'suspended') void ctx.resume()
+    loadSoundFiles(ctx)
   } catch {
     ctx = null
   }
+}
+
+/** 在背景下載並解碼所有音檔；失敗的就繼續用合成音。 */
+function loadSoundFiles(audio: AudioContext): void {
+  if (loadStarted || typeof fetch === 'undefined') return
+  loadStarted = true
+  for (const [sound, file] of Object.entries(SOUND_FILES) as [Sound, string][]) {
+    fetch(`${import.meta.env.BASE_URL}sfx/${file}.mp3`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`${file}: ${res.status}`)
+        return res.arrayBuffer()
+      })
+      .then((data) => audio.decodeAudioData(data))
+      .then((buffer) => buffers.set(sound, buffer))
+      .catch(() => {
+        // 沒有這個檔案或格式錯誤：用合成音
+      })
+  }
+}
+
+/** 播放已載入的音檔；沒有就回傳 false。 */
+function playFile(sound: Sound): boolean {
+  const buffer = buffers.get(sound)
+  if (!ctx || !master || !buffer) return false
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  src.connect(master)
+  src.start()
+  return true
 }
 
 /** 一段音高滑動的方波／三角波等。 */
@@ -77,6 +131,7 @@ function burst(duration: number, volume: number, filterFreq: number, delay = 0):
 
 export function play(sound: Sound): void {
   if (!ctx) return
+  if (playFile(sound)) return
   switch (sound) {
     case 'hit':
       burst(0.08, 0.6, 1800)
