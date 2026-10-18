@@ -27,6 +27,8 @@ import { Particles } from './render/particles'
 const TRAINING_GRUNTS = 3
 const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pistol', 'shotgun', 'chair', 'cabinet']
 const SEPARATION = 14
+/** 兩個雜兵迎面走過時，速度超過這個值就讓他們錯身，不互推。 */
+const PASS_SPEED = 0.05
 /** 空中追擊時特務與浮空敵人之間的最小間距。 */
 const AIR_SPACING = 16
 /** 浮空的雜兵在這個水平距離內時，特務的空中招式才會懸停、收招拉長（空中連段輔助）。 */
@@ -615,6 +617,9 @@ export class World {
         const b = standing[j]
         const dx = b.x - a.x
         if (Math.abs(dx) >= SEPARATION) continue
+        // 兩人迎面走向對方（一個往右、一個往左）：讓他們錯身走過去，不然互推會卡在一起
+        const [left, right] = dx >= 0 ? [a, b] : [b, a]
+        if (left.vx > PASS_SPEED && right.vx < -PASS_SPEED) continue
         const push = ((SEPARATION - Math.abs(dx)) / 2) * 0.25
         const dir = dx === 0 ? (a.id < b.id ? 1 : -1) : Math.sign(dx)
         a.x -= dir * push

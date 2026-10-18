@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { VIEW_W } from './constants'
 import { Grunt } from './enemies/grunt'
+import type { Button } from './input/buttons'
 import { FLOORS } from './level/floors'
 import { World } from './world'
 
@@ -47,4 +48,36 @@ describe('enemies do not keep walking into a wall (regression for "enemies get s
     world.slots.request(9002)
     expect(framesPushingWall(world, g, 200)).toBeLessThan(10)
   })
+})
+
+describe('enemies walking toward each other pass instead of locking up (regression for "one walks right, one walks left, they get stuck")', () => {
+  it('in real fights, two enemies never stay pressed together walking into each other for more than 20 frames', () => {
+    let worst = 0
+    for (let run = 0; run < 4; run++) {
+      const world = new World()
+      world.agent.life.hp = 1e9
+      const streak = new Map<string, number>()
+      let held: Button[] = ['right']
+      for (let f = 0; f < 5000; f++) {
+        if (f % 25 === 0) held = Math.random() < 0.55 ? ['right'] : Math.random() < 0.5 ? ['left'] : []
+        const pressed: Button[] = Math.random() < 0.08 ? [Math.random() < 0.5 ? 'punch' : 'kick'] : []
+        world.update({ pressed, held: new Set([...held, ...pressed]) })
+        const standing = world.enemies.filter((e) => !e.airborne && e.hurtbox())
+        const seen = new Set<string>()
+        for (let i = 0; i < standing.length; i++) {
+          for (let j = i + 1; j < standing.length; j++) {
+            const [a, b] = standing[i].x < standing[j].x ? [standing[i], standing[j]] : [standing[j], standing[i]]
+            if (b.x - a.x >= 10 || a.vx <= 0.3 || b.vx >= -0.3) continue
+            const key = `${a.id}-${b.id}`
+            seen.add(key)
+            const n = (streak.get(key) ?? 0) + 1
+            streak.set(key, n)
+            worst = Math.max(worst, n)
+          }
+        }
+        for (const key of [...streak.keys()]) if (!seen.has(key)) streak.delete(key)
+      }
+    }
+    expect(worst).toBeLessThan(20)
+  }, 120000)
 })
