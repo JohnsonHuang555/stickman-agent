@@ -21,19 +21,30 @@ const ctx = canvas.getContext('2d')!
  * 建立高解析度的像素，每幀用 setTransform 把邏輯座標放大，線條與文字才會清晰。
  */
 function fit() {
-  const cssScale = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)
   const dpr = window.devicePixelRatio || 1
-  canvas.style.width = `${Math.floor(VIEW_W * cssScale)}px`
-  canvas.style.height = `${Math.floor(VIEW_H * cssScale)}px`
-  canvas.width = Math.round(VIEW_W * cssScale * dpr)
-  canvas.height = Math.round(VIEW_H * cssScale * dpr)
+  // 先決定實際像素（裝置像素）的大小，再換回 CSS 尺寸：畫布像素和螢幕像素一對一，
+  // 瀏覽器不會再縮放整張畫面（之前差 1 像素、或位置落在半個像素上，手機上就會整片變糊）
+  const scale = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)
+  const w = Math.floor(VIEW_W * scale * dpr)
+  const h = Math.floor(VIEW_H * scale * dpr)
+  canvas.width = w
+  canvas.height = h
+  canvas.style.width = `${w / dpr}px`
+  canvas.style.height = `${h / dpr}px`
+  // 置中也對齊到整數的裝置像素
+  canvas.style.left = `${Math.round((innerWidth * dpr - w) / 2) / dpr}px`
+  canvas.style.top = `${Math.round((innerHeight * dpr - h) / 2) / dpr}px`
 }
 /** 只畫一次的頁面（開發用總覽）在畫布尺寸改變後要重畫，因為改尺寸會清空畫布。 */
 let redrawStatic: (() => void) | null = null
-addEventListener('resize', () => {
+const refit = () => {
   fit()
   redrawStatic?.()
-})
+}
+addEventListener('resize', refit)
+// 有些手機轉向後的 resize 事件還拿到舊的寬高：稍後再量一次
+addEventListener('orientationchange', () => setTimeout(refit, 300))
+document.addEventListener('fullscreenchange', () => setTimeout(refit, 100))
 fit()
 
 /** 每次繪圖前呼叫：把邏輯座標對應到實際像素。 */
