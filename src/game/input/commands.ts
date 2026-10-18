@@ -13,6 +13,7 @@ export type CommandKind =
   | 'diveSmash'
   | 'dashPunch'
   | 'sweep'
+  | 'crouchPunch'
 
 export interface Command {
   kind: CommandKind
@@ -66,9 +67,10 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   if (DESPERATION_BUTTONS.every((b) => recently(b) && stillHeld(b))) return { kind: 'desperation' }
 
   if (!punch && !kick) return null
+  // 蹲著：Z 蹲拳（腿不動）、X 掃腿（不會站起來）
+  if (ctx.crouching) return { kind: kick ? 'sweep' : 'crouchPunch' }
   if (kick) return { kind: 'kick' }
   if (ctx.up) return { kind: 'launcher' }
-  if (ctx.crouching) return { kind: 'sweep' }
 
   const dir = doubleTapDirection(ctx.presses, ctx.frame)
   if (dir) return { kind: 'dashPunch', dir }

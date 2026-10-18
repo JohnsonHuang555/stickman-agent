@@ -86,8 +86,9 @@ describe('recognizeCommand', () => {
     expect(recognize(presses, 10, { airborne: true })?.kind).toBe('airKick')
   })
 
-  it('crouching z is a sweep', () => {
-    expect(recognize([press('punch', 10)], 10, { crouching: true })?.kind).toBe('sweep')
+  it('crouching z is a crouch punch, crouching x is a sweep', () => {
+    expect(recognize([press('kick', 10)], 10, { crouching: true })?.kind).toBe('sweep')
+    expect(recognize([press('punch', 10)], 10, { crouching: true })?.kind).toBe('crouchPunch')
   })
 
   it('double-tap a direction then z is a dash punch in that direction', () => {

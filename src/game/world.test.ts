@@ -143,10 +143,10 @@ describe('World simulation', () => {
     expect(grunt.life.max - grunt.life.hp).toBe(9)
   })
 
-  it('crouching z sweeps', () => {
+  it('crouching x sweeps', () => {
     const { world, grunt } = arena(16)
     run(world, 2, ['down'])
-    tick(world, ['punch'], ['down'])
+    tick(world, ['kick'], ['down'])
     run(world, 30, ['down'])
     expect(grunt.life.max - grunt.life.hp).toBe(8)
   })

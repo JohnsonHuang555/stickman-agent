@@ -187,6 +187,13 @@ export const MOVES = {
       f.vx = frame > 14 ? 0 : f.vx * 0.94
     },
   },
+  /** ↓+Z：蹲著出拳，腿不動、身體維持低姿勢，可以連按。 */
+  crouchPunch: {
+    clip: attackClip(ATTACK_POSES.crouchPunch, 3, 3, 6, POSES.crouch),
+    length: 12,
+    hit: { from: 3, to: 5, box: { forward: 2, up: 16, w: 24, h: 12 }, damage: 5, hitstun: 14, knockback: 0.4 },
+  },
+  /** ↓+X：蹲著掃腿，全程不會站起來。 */
   sweep: {
     clip: attackClip(ATTACK_POSES.sweep, 4, 6, 13, POSES.crouch),
     length: 23,

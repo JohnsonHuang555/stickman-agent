@@ -35,6 +35,8 @@ const GETUP_FRAMES = 18
 const PICKUP_FRAMES = 10
 /** 空中連段收招結束後，還能接下一招的幀數。 */
 const AIR_CHAIN_GRACE = 14
+/** 跳躍與出拳／踢腿相差幾幀內按下，視為「跳起來出招」。 */
+const JUMP_ATTACK_WINDOW = SIMULTANEOUS_WINDOW
 
 const AERIAL: ReadonlySet<CommandKind> = new Set(['flyingKick', 'airKick', 'diveSmash', 'airPunch'])
 
@@ -51,6 +53,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   diveSmash: 'diveSmash',
   dashPunch: 'dashPunch',
   sweep: 'sweep',
+  crouchPunch: 'crouchPunch',
 }
 
 type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup'
@@ -155,6 +158,7 @@ export class Agent extends Fighter {
   }
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
+    if (cmd && this.tryJumpAttack(cmd.kind, now)) return
     if (cmd && this.tryStart(cmd)) return
     // V：背包（收槍／掏槍／用醫療箱），空中也可以用
     if (this.bagUntil >= now) {
@@ -206,6 +210,13 @@ export class Agent extends Fighter {
   private updateAction(cmd: Command | null, now: number, world: World): void {
     const act = this.act!
     act.frame++
+
+    // 先按攻擊、緊接著按跳：地面招式才剛起手就取消，改成起跳後的空中招式
+    if (act.frame <= JUMP_ATTACK_WINDOW) {
+      const kind = act.def === MOVES.punch1 ? 'punch' : act.def === MOVES.kick ? 'kick' : null
+      if (kind && this.tryJumpAttack(kind, now)) return
+    }
+
     act.def.tick?.(this, act.frame, world)
 
     const assist = act.def.airAssist
@@ -327,6 +338,24 @@ export class Agent extends Fighter {
     return true
   }
 
+  /**
+   * 跳躍和出拳／踢腿幾乎同時按下：優先起跳，攻擊改成對應的空中招式
+   * （拳 → 空中拳；踢 → 空中踢，按著方向就是飛踢），在起跳後的下一幀出手。
+   */
+  private tryJumpAttack(kind: CommandKind, now: number): boolean {
+    if (kind !== 'punch' && kind !== 'kick') return false
+    if (this.airborne || this.jumpUntil < now || this.held || this.carryingHeavy || this.buttons.has('down')) return false
+    const dir = this.heldDir()
+    this.jumpUntil = -1
+    this.act = null
+    this.setState('free')
+    this.startJump(dir)
+    const aerial: Command =
+      kind === 'punch' ? { kind: 'airPunch' } : dir ? { kind: 'flyingKick', dir } : { kind: 'airKick' }
+    this.buffered = { cmd: aerial, until: now + COMMAND_BUFFER }
+    return true
+  }
+
   private startJump(dir: -1 | 0 | 1): void {
     if (dir) this.facing = dir
     this.vx = dir * AIR_DRIFT
@@ -388,9 +417,15 @@ export class Agent extends Fighter {
     return this.state === 'down' && this.life.isDead && this.stateFrame > 60
   }
 
+  /** 正在做低姿勢的動作（蹲拳、掃腿、翻滾）：受擊框維持蹲姿高度。 */
+  private get lowAction(): boolean {
+    const def = this.act?.def
+    return this.state === 'action' && (def === MOVES.crouchPunch || def === MOVES.sweep || def === MOVES.roll)
+  }
+
   hurtbox(): Box | null {
     if (this.state === 'down' || this.state === 'getup') return null
-    if (this.crouching || this.act?.def === MOVES.sweep || this.act?.def === MOVES.roll) return this.bodyBox(CROUCH_HEIGHT)
+    if (this.crouching || this.lowAction) return this.bodyBox(CROUCH_HEIGHT)
     return this.bodyBox(this.airborne ? STAND_HEIGHT - 4 : STAND_HEIGHT)
   }
 
