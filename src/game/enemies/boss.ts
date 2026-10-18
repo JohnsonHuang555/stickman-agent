@@ -182,6 +182,8 @@ export class Boss extends Enemy {
         break
     }
 
+    // 只有空翻斬會轉；被打斷或做別的動作時立刻轉正
+    if (this.state !== 'attack' || this.act?.def !== BOSS_MOVES.flipSlash) this.rotation = 0
     if (this.state === 'stalk') this.stopAtWall(world)
     if (this.applyPhysics(world) && this.state === 'launched') {
       this.setState('down')

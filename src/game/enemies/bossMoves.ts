@@ -35,6 +35,23 @@ const spinClip = new Clip([
   { pose: POSES.land, dur: 10 },
 ])
 
+/** Ryu 空翻斬：蹲低預備 → 往特務跳起空翻 → 落下時雙刀往下斬 → 落地收招（可反擊）。 */
+export const FLIP = {
+  windup: 12,
+  /** 起跳速度；Boss 重力 0.42 下約 28 幀落地。 */
+  jump: 6,
+  /** 空翻轉完一圈的幀數（轉完才出斬擊，落下時身體是正的）。 */
+  spin: 20,
+  slashFrom: 32,
+  slashTo: 42,
+  length: 58,
+  minSpeed: 1.2,
+  maxSpeed: 4.5,
+  /** 落點停在特務前方這麼遠。 */
+  landShort: 24,
+} as const
+const FLIP_AIRTIME = (2 * FLIP.jump) / 0.42
+
 /** 魔王連射：先打三發高的（蹲下躲），再打兩發低的（跳起來躲）。 */
 const SPRAY_SHOTS: readonly [frame: number, height: number][] = [
   [22, 36],
@@ -85,6 +102,40 @@ export const BOSS_MOVES = {
     ...charge(14, 12, 18, 5.5, { box: { forward: 0, up: 14, w: 30, h: 24 }, damage: 16, hitstun: 22, knockback: 3, knockdown: true, heavy: true }),
     range: 150,
     minRange: 40,
+  },
+  flipSlash: {
+    clip: new Clip([
+      { pose: POSES.idleA, dur: 1 },
+      { pose: POSES.crouch, dur: FLIP.windup - 1, blend: 6 },
+      { pose: POSES.tuck, dur: FLIP.slashFrom - 4 - FLIP.windup, blend: 3 },
+      // 下落時雙刀舉過頭，落地前往下劈
+      { pose: ATTACK_POSES.heavySlam[0], dur: 4, blend: 3 },
+      { pose: ATTACK_POSES.heavySlam[1], dur: FLIP.length - FLIP.slashFrom, blend: 2 },
+    ]),
+    length: FLIP.length,
+    range: 140,
+    minRange: 50,
+    hit: hit(FLIP.slashFrom, FLIP.slashTo, {
+      // 從空中往下斬：判定往腳下延伸
+      box: { forward: -6, up: -24, w: 44, h: 56 },
+      damage: 18,
+      hitstun: 24,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    }),
+    tick: (f, frame, world) => {
+      if (frame === FLIP.windup) {
+        // 起跳時決定水平速度，讓落點剛好在特務面前
+        const dist = Math.abs(world.agent.x - f.x)
+        const speed = Math.min(FLIP.maxSpeed, Math.max(FLIP.minSpeed, (dist - FLIP.landShort) / FLIP_AIRTIME))
+        f.vh = FLIP.jump
+        f.vx = f.facing * speed
+      }
+      const t = (frame - FLIP.windup) / FLIP.spin
+      f.rotation = t > 0 && t < 1 ? f.facing * Math.PI * 2 * t : 0
+      if (frame > FLIP.windup + 2 && f.h === 0) f.vx = 0
+    },
   },
   bladeSpin: {
     clip: spinClip,

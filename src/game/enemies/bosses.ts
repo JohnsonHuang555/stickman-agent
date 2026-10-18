@@ -60,8 +60,8 @@ export const BOSSES: Readonly<Record<BossId, BossDef>> = {
     score: 2000,
     costume: 'ryu',
     phases: [
-      { moves: ['bladeSlash', 'bladeSlash', 'bladeDash', 'bladeSpin'], walkSpeed: 1.7, cooldown: [40, 70], held: 'katana', heldBack: 'katana' },
-      { moves: ['bladeSlash', 'bladeDash', 'bladeDash', 'bladeSpin'], walkSpeed: 2.1, cooldown: [22, 45], held: 'katana', heldBack: 'katana' },
+      { moves: ['bladeSlash', 'bladeSlash', 'bladeDash', 'bladeSpin', 'flipSlash'], walkSpeed: 1.7, cooldown: [40, 70], held: 'katana', heldBack: 'katana' },
+      { moves: ['bladeSlash', 'bladeDash', 'flipSlash', 'bladeSpin', 'flipSlash'], walkSpeed: 2.1, cooldown: [22, 45], held: 'katana', heldBack: 'katana' },
     ],
   },
   johnson: {
