@@ -393,6 +393,7 @@ export class Grunt extends Enemy {
     this.flash = 4
     if (this.state === 'attack' && this.act?.def.armor && !this.life.isDead) return
     if (this.state === 'grabbed' && !spec.knockdown && !this.life.isDead) return
+    this.heldPose = null
     this.rotation = this.state === 'grabbed' ? this.rotation : 0
 
     this.act = null
@@ -486,6 +487,9 @@ export class Grunt extends Enemy {
     this.setState('grabbed')
   }
 
+  /** 被抓著時特務指定的姿勢（例如大風車時身體打直）；null 用受擊姿勢。 */
+  heldPose: Pose | null = null
+
   /** 抓著時由特務每幀擺放位置。 */
   holdAt(x: number, h: number, facing: Facing, rotation: number): void {
     this.x = x
@@ -496,6 +500,7 @@ export class Grunt extends Enemy {
 
   /** 被過肩摔砸在地上：直接背部著地倒下（不會再彈起來飛）。 */
   slamDown(dir: Facing): void {
+    this.heldPose = null
     this.rotation = 0
     this.spin = 0
     this.h = 0
@@ -508,6 +513,7 @@ export class Grunt extends Enemy {
   /** 掙脫（抓太久、特務被打）：往後退開，短暫硬直。 */
   breakFree(awayFrom: number): void {
     if (this.state !== 'grabbed') return
+    this.heldPose = null
     this.rotation = 0
     this.h = 0
     this.setState('hurt')
@@ -553,7 +559,7 @@ export class Grunt extends Enemy {
         return this.act!.def.clip.sample(this.act!.frame)
       case 'hurt':
       case 'grabbed':
-        return CLIPS.hurt.sample(0)
+        return this.heldPose ?? CLIPS.hurt.sample(0)
       case 'launched':
       case 'juggled':
         return CLIPS.launched.sample(0)

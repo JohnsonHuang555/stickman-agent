@@ -564,7 +564,10 @@ export class Agent extends Fighter {
 
   /** 放開抓著的人（被打、抓太久）。 */
   private releaseGrab(): void {
-    if (this.grabbed) this.grabbed.squash = null
+    if (this.grabbed) {
+      this.grabbed.squash = null
+      this.grabbed.heldPose = null
+    }
     this.grabbed?.breakFree(this.x)
     this.grabbed = null
   }
@@ -634,17 +637,26 @@ export class Agent extends Fighter {
         break
       case 'swing': {
         const f = this.grabFrame
-        if (this.grabbed && f < GRAB.swing.releaseAt) {
+        const sw = GRAB.swing
+        if (f === sw.headbuttAt && this.grabbed) {
+          // 先用頭槌把對方撞暈
+          this.grabHit(this.grabbed, GRAB_HITS.headbutt, this.facing, world)
+          if (this.grabbed && !this.grabbed.isGrabbed) this.grabbed = null
+        }
+        // 對方在甩出去之前就倒了（被頭槌打死）：直接結束
+        if (!this.grabbed && f < sw.releaseAt) return this.endGrab()
+        if (this.grabbed && f < sw.releaseAt) {
           // 轉的時候一直面向被甩的人
-          this.facing = (Math.cos(swingAngle(f)) >= 0 ? this.grabFacing : -this.grabFacing) as Facing
+          if (f >= sw.spinFrom) this.facing = (Math.cos(swingAngle(f)) >= 0 ? this.grabFacing : -this.grabFacing) as Facing
           this.placeGrabbed()
-          if (f >= GRAB.swing.sweepFrom) this.swingSweep(world)
+          if (f >= sw.sweepFrom) this.swingSweep(world)
         }
         if (f === GRAB.swing.releaseAt && this.grabbed) {
           this.facing = this.grabFacing
           const target = this.grabbed
           this.grabbed = null
           target.squash = null
+          target.heldPose = null
           target.holdAt(target.x, Math.max(target.h, 6), (-this.grabFacing) as Facing, 0)
           this.grabHit(target, GRAB_HITS.swingRelease, this.grabFacing, world)
           // 從手上往斜上方飛出去
@@ -666,7 +678,9 @@ export class Agent extends Fighter {
       case 'suplex':
         return this.placeSuplexed(g)
       case 'swing':
-        return this.placeSwung(g)
+        if (this.grabFrame >= GRAB.swing.fallFrom) return this.placeSwung(g)
+        g.holdAt(this.x + this.facing * GRAB.distance, 0, (-this.facing) as Facing, 0)
+        return
       case 'knee': {
         const lifted = this.grabFrame >= GRAB.knee.hitAt && this.grabFrame < GRAB.knee.hitAt + 4
         g.holdAt(this.x + this.facing * GRAB.distance, lifted ? 3 : 0, (-this.facing) as Facing, 0)
@@ -738,7 +752,7 @@ export class Agent extends Fighter {
    */
   private swingBody(g: Grunt) {
     const f = this.grabFrame
-    const { liftFrames, releaseAt, riseAngle } = GRAB.swing
+    const { spinFrom, releaseAt, riseAngle } = GRAB.swing
     const hand = this.handNow()
     const out = this.facing // updateGrab 已讓特務面向被甩的人
     const rotationFor = (droop: number) => out * (Math.PI / 2 + droop)
@@ -752,7 +766,7 @@ export class Agent extends Fighter {
       else hi = mid
     }
     const onFloor = lo
-    const speed = Math.min(1, Math.max(0, (f - liftFrames) / (releaseAt - liftFrames)))
+    const speed = Math.min(1, Math.max(0, (f - spinFrom) / (releaseAt - spinFrom)))
     const eased = speed * speed * (3 - 2 * speed)
     const droop = onFloor + (-riseAngle - onFloor) * eased
     const depth = Math.max(0.18, Math.abs(Math.cos(swingAngle(f))))
@@ -761,10 +775,20 @@ export class Agent extends Fighter {
 
   private placeSwung(g: Grunt): void {
     const { hand, out, rotation, depth } = this.swingBody(g)
-    // 前幾幀：腳從地上被拉到特務手上，身體同時往外倒成頭朝外
-    const k = Math.min(1, this.grabFrame / GRAB.swing.liftFrames)
+    // 頭槌之後：對方先以腳為支點往後倒到平躺（頭著地），特務再彎身把雙腳抓到腰部的高度
+    const { fallFrom, landAt, spinFrom } = GRAB.swing
+    const f = this.grabFrame
+    g.heldPose = POSES.swung
     const footX = this.x + out * GRAB.distance
-    this.hangByFeet(g, footX + (hand.x - footX) * k, GROUND_Y + (hand.y - GROUND_Y) * k, (-out) as Facing, rotation * k, true)
+    const flat = out * (Math.PI / 2)
+    let k = 1
+    if (f < landAt) {
+      const t = (f - fallFrom) / (landAt - fallFrom)
+      this.hangByFeet(g, footX, GROUND_Y, (-out) as Facing, flat * t * t, true) // 越倒越快
+    } else {
+      k = Math.min(1, (f - landAt) / (spinFrom - landAt))
+      this.hangByFeet(g, footX + (hand.x - footX) * k, GROUND_Y + (hand.y - GROUND_Y) * k, (-out) as Facing, flat + (rotation - flat) * k, true)
+    }
     g.squash = { scale: 1 + (depth - 1) * k, originX: hand.x }
   }
 

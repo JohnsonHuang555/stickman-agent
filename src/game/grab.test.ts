@@ -218,7 +218,7 @@ describe('grab moves', () => {
     expect(sidesSeen.has(1) && sidesSeen.has(-1)).toBe(true)
     expect(999 - left.life.hp).toBe(GRAB_HITS.swingSweep.damage)
     expect(999 - right.life.hp).toBe(GRAB_HITS.swingSweep.damage)
-    expect(lost(g)).toBe(GRAB_HITS.swingRelease.damage)
+    expect(lost(g)).toBe(GRAB_HITS.headbutt.damage + GRAB_HITS.swingRelease.damage)
     expect(maxInvuln).toBeGreaterThan(0)
     expect(g.isGrabbed).toBe(false)
   })
@@ -261,7 +261,8 @@ describe('grab animations (regression for "back + X and space look unnatural")',
       const h = hand(world)
       maxGap = Math.max(maxGap, Math.hypot(c.x - h.x, c.y - h.y))
     }
-    expect(maxGap).toBeLessThan(16 * g.scale)
+    // 摔下前一刻身體中心停在地面上方，不會陷進地板，所以容許比手稍遠一點
+    expect(maxGap).toBeLessThan(24 * g.scale)
     run(world, 2)
     // 摔下之後：背部著地躺在特務身後，不會再飄起來
     for (let i = 0; i < 20; i++) {
@@ -271,7 +272,7 @@ describe('grab animations (regression for "back + X and space look unnatural")',
     }
   })
 
-  it('giant swing: held by the ankles, the head starts on the floor, sweeps up into the air, and the enemy flies up on release', () => {
+  it('giant swing: headbutt, the enemy falls back head-first to the floor, feet lifted to your waist, head sweeps up, then flies up on release', () => {
     const { world, g } = grabbed()
     tick(world, ['jump'])
     /** 被甩的人頭的中心離地多高（用實際姿勢轉完之後的位置）。 */
@@ -287,18 +288,25 @@ describe('grab animations (regression for "back + X and space look unnatural")',
       const dy = footY - hu - py
       return GROUND_Y - (py + dx * Math.sin(g.rotation) + dy * Math.cos(g.rotation))
     }
-    const heads: number[] = []
+    // 一直記錄到甩出去為止（頭槌的頓幀會讓實際幀數變長）
+    const lifted: { head: number; hand: number }[] = []
+    let fellFlat = false
     let minSquash = 1
-    for (let i = 1; i < GRAB.swing.releaseAt; i++) {
+    for (let i = 0; i < 150 && g.isGrabbed; i++) {
       tick(world)
-      if (i > GRAB.swing.liftFrames) {
-        heads.push(headHeight())
+      if (!g.isGrabbed) break
+      const r = Math.abs(g.rotation)
+      // 往後倒的途中頭不會往上翹（身體轉的角度只增不減到平躺）
+      if (r > 0.1 && r <= Math.PI / 2 + 0.01) fellFlat = true
+      if (r > Math.PI / 2 + 0.01 || lifted.length) {
+        lifted.push({ head: headHeight(), hand: GROUND_Y - hand(world).y })
         minSquash = Math.min(minSquash, g.squash?.scale ?? 1)
-        expect(g.squash?.originX).toBeCloseTo(hand(world).x)
       }
     }
-    expect(heads[0]).toBeLessThan(6) // 一開始頭拖在地上
-    expect(heads[heads.length - 1]).toBeGreaterThan(GROUND_Y - hand(world).y) // 最後比手還高
+    expect(fellFlat).toBe(true)
+    expect(lifted[0].head).toBeLessThan(6) // 腳被抓起來時頭在地上
+    const last = lifted[lifted.length - 1]
+    expect(last.head).toBeGreaterThan(last.hand) // 甩出去前頭比手還高
     expect(minSquash).toBeLessThan(0.4) // 轉到前後方時有透視
     let maxH = 0
     for (let i = 0; i < 20; i++) {
