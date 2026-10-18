@@ -98,8 +98,45 @@ describe('settings screen', () => {
     expect(world.paused).toBe(true)
     press(app, 'right')
     expect(app.settings.music).toBeCloseTo(0.35)
-    press(app, 'up')
+    press(app, 'down')
+    press(app, 'down') // MUSIC → SFX → RESUME
     press(app, 'confirm')
     expect(world.paused).toBe(false)
+  })
+
+  /** 開始一局並暫停，游標移到 QUIT TO TITLE。 */
+  function pausedOnQuit() {
+    const { app } = makeApp()
+    press(app, 'confirm')
+    press(app, 'pause')
+    press(app, 'up') // 從第一項往上繞到最後一項 QUIT TO TITLE
+    return app
+  }
+
+  it('QUIT TO TITLE asks once, and the second press returns to the title without recording a score', async () => {
+    const app = pausedOnQuit()
+    press(app, 'confirm')
+    expect(app.screen.kind).toBe('playing')
+    expect(app.quitArmed).toBe(true)
+    press(app, 'confirm')
+    expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
+    press(app, 'down')
+    press(app, 'confirm') // LEADERBOARD
+    await new Promise((r) => setTimeout(r, 0))
+    expect(app.screen).toMatchObject({ kind: 'leaderboard', entries: [] })
+  })
+
+  it('moving the cursor away cancels the quit confirmation', () => {
+    const app = pausedOnQuit()
+    press(app, 'confirm')
+    press(app, 'up')
+    press(app, 'down')
+    expect(app.quitArmed).toBe(false)
+    press(app, 'confirm')
+    expect(app.screen.kind).toBe('playing') // 要重新確認一次，不會直接離開
+  })
+
+  it('the title-screen settings has no quit option (BACK already goes to the title)', () => {
+    expect(SETTINGS_MENU).not.toContain('QUIT')
   })
 })

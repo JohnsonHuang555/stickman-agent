@@ -8,8 +8,11 @@ import { drawBackground } from './background'
 import { text } from './hud'
 
 export const TITLE_MENU = ['START', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
-/** 設定畫面的選項：最後一項在標題是 BACK、在遊戲中暫停是 RESUME。 */
+/** 從標題進入的設定畫面：DONE 顯示為 BACK。 */
 export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
+/** 遊戲中暫停的面板：DONE 顯示為 RESUME，多一個回到主畫面。 */
+export const PAUSE_MENU = ['MUSIC', 'SFX', 'DONE', 'QUIT'] as const
+export type SettingsItem = (typeof PAUSE_MENU)[number]
 
 // 標題畫面的魔王只是裝飾
 const titleBoss = new Boss(400, 'johnson')
@@ -95,6 +98,8 @@ export function drawSettings(
   cursor: number,
   frame: number,
   overlay: boolean,
+  /** 已經按過一次 QUIT，等第二次確認。 */
+  quitArmed = false,
 ): void {
   if (overlay) dim(ctx, 0.8)
   else {
@@ -108,8 +113,10 @@ export function drawSettings(
     ['SFX', settings.sfx],
     [overlay ? 'RESUME' : 'BACK', null],
   ]
+  if (overlay) rows.push([quitArmed ? 'QUIT TO TITLE?  PRESS Z AGAIN' : 'QUIT TO TITLE', null])
+  const rowGap = overlay ? 14 : 16
   rows.forEach(([label, value], i) => {
-    const y = 34 + i * 16
+    const y = 32 + i * rowGap
     if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', 128, y, 8)
     text(ctx, label, 144, y, 8)
     if (value === null) return
@@ -127,7 +134,7 @@ export function drawSettings(
   const cols = [14, 170, 326]
   CONTROL_GROUPS.forEach((group, g) => {
     const x = cols[g]
-    let y = 92
+    let y = overlay ? 98 : 92
     ctx.fillStyle = '#f5c518'
     ctx.font = 'bold 8px monospace'
     ctx.textAlign = 'left'
@@ -140,7 +147,7 @@ export function drawSettings(
       ctx.fillText(keys, x, y)
       ctx.fillStyle = 'rgba(255,255,255,0.75)'
       ctx.fillText(action, x + 62, y)
-      y += 13
+      y += overlay ? 12.5 : 13
     }
   })
 

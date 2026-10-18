@@ -1,7 +1,7 @@
 import { musicFor, type MusicTrack } from './audio/music'
 import type { Sound } from './audio/sfx'
 import type { InputSnapshot } from './game/input/buttons'
-import { SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle } from './game/render/screens'
+import { PAUSE_MENU, SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle, type SettingsItem } from './game/render/screens'
 import { World, type WorldOptions } from './game/world'
 import { ANONYMOUS, type Leaderboard, type LeaderboardEntry } from './leaderboard/leaderboard'
 import { DEFAULT_SETTINGS, adjustVolume, type Settings } from './settings'
@@ -46,8 +46,9 @@ export class App {
   screen: Screen = { kind: 'title', cursor: 0 }
   nickname: string | null
   settings: Settings
-  /** 遊戲中暫停時，設定面板的游標。 */
+  /** 遊戲中暫停時，設定面板的游標；quitArmed = 已經按過一次「回到主畫面」，再按一次才真的離開。 */
   pauseCursor = 0
+  quitArmed = false
   private frame = 0
 
   constructor(private readonly deps: AppDeps) {
@@ -73,11 +74,18 @@ export class App {
         world.update(input)
         if (world.paused) {
           // 剛按下暫停：游標回到第一項；之後在面板上調音量，選 RESUME 繼續
-          if (!wasPaused) this.pauseCursor = 0
-          else {
-            this.pauseCursor = this.settingsInput(pressed, this.pauseCursor, () => {
-              world.paused = false
+          if (!wasPaused) {
+            this.pauseCursor = 0
+            this.quitArmed = false
+          } else {
+            const before = this.pauseCursor
+            this.pauseCursor = this.settingsInput(pressed, this.pauseCursor, PAUSE_MENU, (item) => {
+              if (item === 'DONE') world.paused = false
+              else if (this.quitArmed) this.quitToTitle()
+              else this.quitArmed = true
             })
+            // 移開游標就取消「回到主畫面」的確認
+            if (this.pauseCursor !== before) this.quitArmed = false
           }
         }
         if (world.restartRequested) void this.finishRun(world)
@@ -92,7 +100,7 @@ export class App {
           back()
           break
         }
-        screen.cursor = this.settingsInput(pressed, screen.cursor, back)
+        screen.cursor = this.settingsInput(pressed, screen.cursor, SETTINGS_MENU, back)
         break
       }
       case 'dialog':
@@ -128,10 +136,15 @@ export class App {
   }
 
   /**
-   * 設定面板的操作：↑↓ 選項、←→ 調音量、在最後一項按 Z／ENTER 執行 done。回傳新的游標。
+   * 設定面板的操作：↑↓ 選項、←→ 調音量、在 DONE／QUIT 按 Z／ENTER 執行 choose。回傳新的游標。
    */
-  private settingsInput(pressed: (...buttons: string[]) => boolean, cursor: number, done: () => void): number {
-    const n = SETTINGS_MENU.length
+  private settingsInput(
+    pressed: (...buttons: string[]) => boolean,
+    cursor: number,
+    items: readonly SettingsItem[],
+    choose: (item: 'DONE' | 'QUIT') => void,
+  ): number {
+    const n = items.length
     if (pressed('up')) {
       this.deps.sound('menu')
       return (cursor - 1 + n) % n
@@ -140,7 +153,7 @@ export class App {
       this.deps.sound('menu')
       return (cursor + 1) % n
     }
-    const item = SETTINGS_MENU[cursor]
+    const item = items[cursor]
     const delta = pressed('right') ? 1 : pressed('left') ? -1 : 0
     if (delta && (item === 'MUSIC' || item === 'SFX')) {
       this.settings = adjustVolume(this.settings, item === 'MUSIC' ? 'music' : 'sfx', delta)
@@ -148,11 +161,17 @@ export class App {
       // 調音效時放一聲讓玩家聽聽看大小
       this.deps.sound(item === 'SFX' ? 'hit' : 'menu')
     }
-    if (item === 'DONE' && pressed('punch', 'confirm', 'jump')) {
+    if ((item === 'DONE' || item === 'QUIT') && pressed('punch', 'confirm', 'jump')) {
       this.deps.sound('select')
-      done()
+      choose(item)
     }
     return cursor
+  }
+
+  /** 從暫停面板回到主畫面：放棄這一局，不記錄成績。 */
+  private quitToTitle(): void {
+    this.quitArmed = false
+    this.screen = { kind: 'title', cursor: 0 }
   }
 
   private moveCursor(screen: { cursor: number }, delta: number): void {
@@ -233,7 +252,7 @@ export class App {
         break
       case 'playing':
         screen.world.render(ctx)
-        if (screen.world.paused) drawSettings(ctx, this.settings, this.pauseCursor, this.frame, true)
+        if (screen.world.paused) drawSettings(ctx, this.settings, this.pauseCursor, this.frame, true, this.quitArmed)
         break
       case 'settings':
         drawSettings(ctx, this.settings, screen.cursor, this.frame, false)
