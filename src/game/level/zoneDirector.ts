@@ -33,6 +33,11 @@ export class ZoneDirector {
     return !this.locked && this.zoneIndex === this.floor.zones.length - 1
   }
 
+  /** 鎖定中、這個區段的最後一波已經全部出場：再打倒場上的敵人就清場了。 */
+  get finalWaveOut(): boolean {
+    return this.locked && this.queue.length === 0 && this.wave === this.zone!.waves.length - 1
+  }
+
   /** 下一個區段的觸發點（或樓梯）。 */
   get nextTarget(): number {
     const next = this.floor.zones[this.zoneIndex + 1]

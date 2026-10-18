@@ -2,7 +2,7 @@ import type { Sound } from '../audio/sfx'
 import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
 import { ComboCounter } from './combat/comboCounter'
-import { overlaps, type HitSpec, type Hitter } from './combat/types'
+import { overlaps, type Box, type HitSpec, type Hitter } from './combat/types'
 import { GROUND_Y, VIEW_W } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
 import { Boss } from './enemies/boss'
@@ -20,7 +20,10 @@ import { Crate } from './level/crate'
 import { ZoneDirector } from './level/zoneDirector'
 import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
+import { GHOST_EVERY, ImpactFx } from './render/impact'
 import { Particles } from './render/particles'
+import { MOVES } from './agent/moves'
+import type { ActionDef } from './combat/types'
 
 const TRAINING_GRUNTS = 3
 const TRAINING_ITEMS: ItemTypeId[] = ['bat', 'crowbar', 'knife', 'katana', 'pistol', 'shotgun', 'chair', 'cabinet']
@@ -39,6 +42,17 @@ const HIT_SCORE = 10
 /** 被打飛撞到牆時的額外傷害。 */
 const WALL_BOUNCE_DAMAGE = 6
 const MUZZLE_FRAMES = 5
+/** 會留下殘影的特務招式（快、重的動作）。 */
+const GHOST_MOVES: ReadonlySet<ActionDef> = new Set<ActionDef>([
+  MOVES.flyingKick, MOVES.dashPunch, MOVES.diveSmash, MOVES.airSpike, MOVES.punch3,
+  MOVES.launcher, MOVES.roll, MOVES.desperation, MOVES.sweep,
+])
+/** 敵人移動得比這快（被打飛、衝刺）就留殘影。 */
+const GHOST_SPEED = 2.3
+const GHOST_COLOR = { agent: '#4a78c0', gang: '#c0504a' } as const
+/** 打倒區段最後一個敵人／魔王：慢動作長度（實際幀數）與速度（每幾幀推進一次）。 */
+const FINISH_SLOWMO_FRAMES = 60
+const SLOWMO_RATE = 3
 /** 自動撿起醫療箱、分數道具的距離。 */
 const CONSUME_REACH = 12
 
@@ -129,6 +143,9 @@ export class World {
   private respawnAt = 0
   private itemRespawnAt = 0
   private readonly particles = new Particles()
+  readonly fx = new ImpactFx()
+  /** 剩下幾個實際幀的慢動作。 */
+  slowmo = 0
   private readonly buffer = new InputBuffer()
 
   constructor(options: WorldOptions = {}) {
@@ -209,9 +226,15 @@ export class World {
 
   private stepSimulation(input: InputSnapshot): void {
     this.agent.readInput(input, this.buffer, this.realFrame)
+    this.fx.update(this.realFrame)
     if (this.hitstop > 0) {
       this.hitstop--
       return
+    }
+    // 慢動作：每 SLOWMO_RATE 個實際幀才推進一次
+    if (this.slowmo > 0) {
+      this.slowmo--
+      if (this.slowmo % SLOWMO_RATE !== 0) return
     }
     this.floorFrames++
 
@@ -220,6 +243,7 @@ export class World {
     for (const i of this.items) i.update(this)
     for (const b of this.bullets) b.update(this)
     this.particles.update()
+    this.recordGhosts()
     this.combo.update(this.realFrame)
     this.separateGrunts()
     this.keepAirSpacing()
@@ -473,6 +497,61 @@ export class World {
     return { left: 8, right: this.floorWidth - 8 }
   }
 
+  /** 命中的打擊演出：衝擊閃光、下砸／斷條時推近鏡頭、清場時慢動作。 */
+  private hitEffects(spec: HitSpec, box: Box, hurtbox: Box, target: Fighter, dir: Facing, wasAlive: boolean, barsBefore: number): void {
+    // 閃光畫在判定框和受擊框重疊的中心
+    const x0 = Math.max(box.x, hurtbox.x)
+    const x1 = Math.min(box.x + box.w, hurtbox.x + hurtbox.w)
+    const y0 = Math.max(box.y, hurtbox.y)
+    const y1 = Math.min(box.y + box.h, hurtbox.y + hurtbox.h)
+    const x = (x0 + x1) / 2
+    const y = (y0 + y1) / 2
+    const finishing = target instanceof Enemy && wasAlive && target.life.isDead && this.isFinishingBlow(target)
+    const heavy = !!(spec.heavy || spec.knockdown || spec.launch) || finishing
+    this.fx.spark(x, y, heavy, target === this.agent, dir, this.realFrame)
+
+    if (!(target instanceof Enemy)) return
+    if (finishing) {
+      this.slowmo = FINISH_SLOWMO_FRAMES
+      this.fx.whiteFlash(8, this.realFrame)
+      this.fx.pushIn(x, y, 0.22, FINISH_SLOWMO_FRAMES - 10, this.realFrame)
+    } else if (spec.spike) {
+      this.fx.pushIn(x, y, 0.1, 6, this.realFrame)
+    } else if (target instanceof Boss && target.life.barsRemaining < barsBefore) {
+      this.fx.pushIn(x, y, 0.14, 12, this.realFrame)
+    }
+  }
+
+  /** 打倒的是魔王，或區段最後一波的最後一個敵人。 */
+  private isFinishingBlow(target: Enemy): boolean {
+    if (target instanceof Boss) return true
+    if (!this.director?.finalWaveOut) return false
+    return this.enemies.every((e) => e === target || e.isGone || e.life.isDead)
+  }
+
+  /** 快、重的動作留下殘影。 */
+  private recordGhosts(): void {
+    if (this.floorFrames % GHOST_EVERY !== 0) return
+    const move = this.agent.currentMove
+    const fast = (f: Fighter) => (f === this.agent ? !!move && GHOST_MOVES.has(move) : Math.abs(f.vx) >= GHOST_SPEED)
+    for (const f of this.fighters) {
+      if (!fast(f) || f.alpha < 1) continue
+      this.fx.ghost(
+        {
+          pose: f.pose(),
+          x: f.x,
+          footY: GROUND_Y - f.h,
+          facing: f.facing,
+          scale: f.scale,
+          rotation: f.rotation,
+          grounded: f.h === 0,
+          color: GHOST_COLOR[f.team],
+        },
+        this.realFrame,
+      )
+    }
+  }
+
   /** 被打飛的雜兵撞到牆：額外受傷、震動畫面、牆邊揚起碎屑，算一次連擊。 */
   wallBounce(g: Grunt, side: Facing): void {
     const wasAlive = !g.life.isDead
@@ -481,6 +560,8 @@ export class World {
     this.burst(g.x + side * 6, GROUND_Y - g.h - 20, '#d8d0c0')
     this.hitstop = Math.max(this.hitstop, 5)
     this.quake(4)
+    this.fx.spark(g.x + side * 6, GROUND_Y - g.h - 20, true, false, side, this.realFrame)
+    this.fx.pushIn(g.x, GROUND_Y - g.h - 20, 0.12, 8, this.realFrame)
     this.sound('heavyHit')
     this.combo.hit(this.realFrame)
     this.score += HIT_SCORE * this.combo.multiplier
@@ -551,8 +632,10 @@ export class World {
             : target.x === attacker.x ? attacker.facing : target.x > attacker.x ? 1 : -1
         const wasAlive = !target.life.isDead
         const wasJuggled = target instanceof Grunt && target.juggled
+        const barsBefore = target.life.barsRemaining
         target.receiveHit(hit.spec, dir, this)
         attacker.onHitLanded?.(this)
+        this.hitEffects(hit.spec, hit.box, hurtbox, target, dir, wasAlive, barsBefore)
 
         // 空中追擊的輕擊頓幀較短，連段才流暢、敵人不會像定格在空中
         this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : wasJuggled ? 2 : 4)
@@ -654,10 +737,12 @@ export class World {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
     const camX = this.camX
+    this.fx.applyZoom(ctx, camX, this.realFrame)
     drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame)
     for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)
+    this.fx.drawGhosts(ctx, camX, this.realFrame)
     for (const g of this.enemies) g.draw(ctx, camX)
     this.agent.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'flying') i.draw(ctx, camX)
@@ -675,6 +760,7 @@ export class World {
       ctx.fill()
     }
     this.particles.draw(ctx, camX)
+    this.fx.drawSparks(ctx, camX, this.realFrame)
     ctx.font = '8px "Press Start 2P", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'
@@ -688,6 +774,7 @@ export class World {
     }
     if (this.debug) this.drawBoxes(ctx, camX)
     ctx.restore()
+    this.fx.drawWhite(ctx, this.realFrame)
     drawHud(ctx, this)
   }
 
