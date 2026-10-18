@@ -1,9 +1,10 @@
 import { musicFor, type MusicTrack } from './audio/music'
 import type { Sound } from './audio/sfx'
 import type { InputSnapshot } from './game/input/buttons'
-import { TITLE_MENU, drawLeaderboard, drawTitle } from './game/render/screens'
+import { SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle } from './game/render/screens'
 import { World, type WorldOptions } from './game/world'
 import { ANONYMOUS, type Leaderboard, type LeaderboardEntry } from './leaderboard/leaderboard'
+import { DEFAULT_SETTINGS, adjustVolume, type Settings } from './settings'
 
 const LEADERBOARD_SIZE = 10
 
@@ -17,6 +18,10 @@ export interface AppDeps {
   sound: (s: Sound) => void
   /** 每幀告訴背景音樂現在該放哪首、是否暫停。 */
   music?: (track: MusicTrack | null, paused: boolean) => void
+  /** 一開始的設定（音量）；省略用預設值。 */
+  settings?: Settings
+  /** 設定改變時呼叫（套用音量、存起來）。 */
+  onSettingsChange?: (settings: Settings) => void
   /** 對話框關閉後呼叫，清掉殘留按鍵。 */
   onDialogClosed?: () => void
   now?: () => number
@@ -27,21 +32,27 @@ export interface AppDeps {
  * - playing：遊玩中
  * - dialog：等待暱稱對話框
  * - leaderboard：排行榜（遊玩結束後會標出自己這筆）
+ * - settings：設定（音量與操作說明）；遊戲中暫停時同一個面板蓋在遊戲畫面上
  */
 type Screen =
   | { kind: 'title'; cursor: number }
   | { kind: 'playing'; world: World }
   | { kind: 'dialog'; background: World | null }
   | { kind: 'leaderboard'; entries: LeaderboardEntry[] | null; highlight: LeaderboardEntry | null }
+  | { kind: 'settings'; cursor: number }
 
 /** 整個遊戲的畫面流程。 */
 export class App {
   screen: Screen = { kind: 'title', cursor: 0 }
   nickname: string | null
+  settings: Settings
+  /** 遊戲中暫停時，設定面板的游標。 */
+  pauseCursor = 0
   private frame = 0
 
   constructor(private readonly deps: AppDeps) {
     this.nickname = deps.loadNickname()
+    this.settings = deps.settings ?? { ...DEFAULT_SETTINGS }
   }
 
   update(input: InputSnapshot): void {
@@ -56,10 +67,34 @@ export class App {
         if (pressed('punch', 'confirm', 'jump')) this.choose(TITLE_MENU[screen.cursor])
         break
       }
-      case 'playing':
-        screen.world.update(input)
-        if (screen.world.restartRequested) void this.finishRun(screen.world)
+      case 'playing': {
+        const world = screen.world
+        const wasPaused = world.paused
+        world.update(input)
+        if (world.paused) {
+          // 剛按下暫停：游標回到第一項；之後在面板上調音量，選 RESUME 繼續
+          if (!wasPaused) this.pauseCursor = 0
+          else {
+            this.pauseCursor = this.settingsInput(pressed, this.pauseCursor, () => {
+              world.paused = false
+            })
+          }
+        }
+        if (world.restartRequested) void this.finishRun(world)
         break
+      }
+      case 'settings': {
+        const back = () => {
+          this.screen = { kind: 'title', cursor: TITLE_MENU.indexOf('SETTINGS') }
+        }
+        if (pressed('pause')) {
+          this.deps.sound('select')
+          back()
+          break
+        }
+        screen.cursor = this.settingsInput(pressed, screen.cursor, back)
+        break
+      }
       case 'dialog':
         break
       case 'leaderboard':
@@ -88,8 +123,36 @@ export class App {
   }
 
   private updateMusic(): void {
-    const paused = this.screen.kind === 'playing' && this.screen.world.paused
-    this.deps.music?.(this.musicTrack, paused)
+    // 暫停時音樂不停：在暫停面板調音樂音量時才聽得到變化
+    this.deps.music?.(this.musicTrack, false)
+  }
+
+  /**
+   * 設定面板的操作：↑↓ 選項、←→ 調音量、在最後一項按 Z／ENTER 執行 done。回傳新的游標。
+   */
+  private settingsInput(pressed: (...buttons: string[]) => boolean, cursor: number, done: () => void): number {
+    const n = SETTINGS_MENU.length
+    if (pressed('up')) {
+      this.deps.sound('menu')
+      return (cursor - 1 + n) % n
+    }
+    if (pressed('down')) {
+      this.deps.sound('menu')
+      return (cursor + 1) % n
+    }
+    const item = SETTINGS_MENU[cursor]
+    const delta = pressed('right') ? 1 : pressed('left') ? -1 : 0
+    if (delta && (item === 'MUSIC' || item === 'SFX')) {
+      this.settings = adjustVolume(this.settings, item === 'MUSIC' ? 'music' : 'sfx', delta)
+      this.deps.onSettingsChange?.(this.settings)
+      // 調音效時放一聲讓玩家聽聽看大小
+      this.deps.sound(item === 'SFX' ? 'hit' : 'menu')
+    }
+    if (item === 'DONE' && pressed('punch', 'confirm', 'jump')) {
+      this.deps.sound('select')
+      done()
+    }
+    return cursor
   }
 
   private moveCursor(screen: { cursor: number }, delta: number): void {
@@ -102,9 +165,12 @@ export class App {
     if (item === 'START') {
       const world = new World(this.deps.worldOptions)
       world.sound = this.deps.sound
+      world.pauseOverlay = false
       this.screen = { kind: 'playing', world }
     } else if (item === 'LEADERBOARD') {
       void this.showLeaderboard(null)
+    } else if (item === 'SETTINGS') {
+      this.screen = { kind: 'settings', cursor: 0 }
     } else {
       void this.changeNickname()
     }
@@ -115,7 +181,7 @@ export class App {
     const name = await this.deps.askNickname({ initial: this.nickname, firstTime: false })
     if (name) this.setNickname(name)
     this.deps.onDialogClosed?.()
-    this.screen = { kind: 'title', cursor: 2 }
+    this.screen = { kind: 'title', cursor: TITLE_MENU.indexOf('NICKNAME') }
   }
 
   /** 一局結束：還沒有暱稱就先問一次（可略過），然後上傳成績並顯示排行榜。 */
@@ -167,10 +233,14 @@ export class App {
         break
       case 'playing':
         screen.world.render(ctx)
+        if (screen.world.paused) drawSettings(ctx, this.settings, this.pauseCursor, this.frame, true)
+        break
+      case 'settings':
+        drawSettings(ctx, this.settings, screen.cursor, this.frame, false)
         break
       case 'dialog':
         if (screen.background) screen.background.render(ctx)
-        else drawTitle(ctx, 2, this.nickname, this.frame)
+        else drawTitle(ctx, TITLE_MENU.indexOf('NICKNAME'), this.nickname, this.frame)
         break
       case 'leaderboard':
         drawLeaderboard(ctx, screen.entries, screen.highlight, this.frame)

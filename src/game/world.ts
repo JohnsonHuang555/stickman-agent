@@ -112,6 +112,8 @@ export class World {
   realFrame = 0
   score = 0
   paused = false
+  /** 暫停時由 HUD 畫簡單的「PAUSE」；App 會改畫設定面板並把這個關掉。 */
+  pauseOverlay = true
   debug = false
   camX = 0
   gameOver = false

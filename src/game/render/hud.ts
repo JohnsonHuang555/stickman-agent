@@ -100,10 +100,9 @@ function drawBag(ctx: CanvasRenderingContext2D, world: World): void {
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
-  // 淡色背景上白字不好讀：在上方資訊與下方操作說明後面墊一條半透明深色底
+  // 淡色背景上白字不好讀：在上方資訊後面墊一條半透明深色底
   ctx.fillStyle = 'rgba(20,16,24,0.45)'
   ctx.fillRect(0, 0, VIEW_W, world.agent.held ? 40 : 32)
-  ctx.fillRect(0, VIEW_H - 12, VIEW_W, 12)
 
   text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, 8, 8)
   text(ctx, 'AGENT', 8, 20, 6)
@@ -172,11 +171,6 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     }
   }
 
-  ctx.font = '7px monospace'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'bottom'
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.fillText('←→ 移動  Z 拳  X 踢  空白 跳  C 撿/丟  V 背包  ↑Z 挑空  空中↓Z 下砸  空中→X 飛踢  ↓空白 翻滾  Z+X+C 保命招  →→Z 衝刺拳  P 暫停', VIEW_W / 2, VIEW_H - 3)
 
   if (world.gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
@@ -189,7 +183,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     }
   }
 
-  if (world.paused) {
+  // 由外層（App）畫暫停設定面板時就不畫這個簡單的暫停畫面
+  if (world.paused && world.pauseOverlay) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
     text(ctx, 'PAUSE', VIEW_W / 2, VIEW_H / 2 - 8, 16, 'center')

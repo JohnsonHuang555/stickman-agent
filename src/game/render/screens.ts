@@ -1,4 +1,5 @@
 import { ANONYMOUS, floorLabel, type LeaderboardEntry } from '../../leaderboard/leaderboard'
+import { CONTROL_GROUPS, type Settings } from '../../settings'
 import { GROUND_Y, VIEW_H, VIEW_W } from '../constants'
 import { Boss } from '../enemies/boss'
 import { drawStickman } from '../stickman/pose'
@@ -6,7 +7,9 @@ import { ATTACK_POSES } from '../stickman/poses'
 import { drawBackground } from './background'
 import { text } from './hud'
 
-export const TITLE_MENU = ['START', 'LEADERBOARD', 'NICKNAME'] as const
+export const TITLE_MENU = ['START', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
+/** 設定畫面的選項：最後一項在標題是 BACK、在遊戲中暫停是 RESUME。 */
+export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
 
 // 標題畫面的魔王只是裝飾
 const titleBoss = new Boss(400, 'johnson')
@@ -80,4 +83,70 @@ export function drawLeaderboard(
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
   ctx.fillText('Z / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
+}
+
+/**
+ * 設定畫面：上半部調音樂與音效音量，下半部是所有操作說明。
+ * overlay = true 時畫在遊戲畫面上（遊戲中按 P／ESC 暫停）。
+ */
+export function drawSettings(
+  ctx: CanvasRenderingContext2D,
+  settings: Settings,
+  cursor: number,
+  frame: number,
+  overlay: boolean,
+): void {
+  if (overlay) dim(ctx, 0.8)
+  else {
+    drawBackground(ctx, 'lobby', frame * 0.3, null, frame)
+    dim(ctx, 0.75)
+  }
+  text(ctx, overlay ? 'PAUSE' : 'SETTINGS', VIEW_W / 2, 10, 12, 'center')
+
+  const rows: [string, number | null][] = [
+    ['MUSIC', settings.music],
+    ['SFX', settings.sfx],
+    [overlay ? 'RESUME' : 'BACK', null],
+  ]
+  rows.forEach(([label, value], i) => {
+    const y = 34 + i * 16
+    if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', 128, y, 8)
+    text(ctx, label, 144, y, 8)
+    if (value === null) return
+    // 音量條：20 格，每格 5%
+    const cells = 20
+    const filled = Math.round(value * cells)
+    for (let c = 0; c < cells; c++) {
+      ctx.fillStyle = c < filled ? '#f5c518' : 'rgba(255,255,255,0.2)'
+      ctx.fillRect(208 + c * 5, y, 4, 8)
+    }
+    text(ctx, `${Math.round(value * 100)}%`, 318, y, 8)
+  })
+
+  // 操作說明：三欄
+  const cols = [14, 170, 326]
+  CONTROL_GROUPS.forEach((group, g) => {
+    const x = cols[g]
+    let y = 92
+    ctx.fillStyle = '#f5c518'
+    ctx.font = 'bold 8px monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    ctx.fillText(group.title, x, y)
+    y += 13
+    ctx.font = '7px monospace'
+    for (const [keys, action] of group.items) {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(keys, x, y)
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'
+      ctx.fillText(action, x + 62, y)
+      y += 13
+    }
+  })
+
+  ctx.font = '7px monospace'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.fillText(overlay ? '↑↓ 選擇   ←→ 調整音量   P／ESC 繼續遊戲' : '↑↓ 選擇   ←→ 調整音量   ESC 返回', VIEW_W / 2, VIEW_H - 6)
 }

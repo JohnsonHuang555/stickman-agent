@@ -42,9 +42,18 @@ const SOUND_FILES: Partial<Record<Sound, string>> = {
 const buffers = new Map<Sound, AudioBuffer>()
 let loadStarted = false
 
+/** 音效音量（設定畫面可調）。 */
+let sfxVolume = 0.35
+
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let noise: AudioBuffer | null = null
+
+/** 調整音效音量（0～1）。 */
+export function setSfxVolume(volume: number): void {
+  sfxVolume = volume
+  if (master) master.gain.value = volume
+}
 
 /** 必須在使用者按鍵的事件裡呼叫一次，瀏覽器才允許播放聲音。 */
 export function unlockAudio(): void {
@@ -54,7 +63,7 @@ export function unlockAudio(): void {
       if (!Ctor) return
       ctx = new Ctor()
       master = ctx.createGain()
-      master.gain.value = 0.35
+      master.gain.value = sfxVolume
       master.connect(ctx.destination)
       noise = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate)
       const data = noise.getChannelData(0)

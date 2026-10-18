@@ -33,7 +33,8 @@ export function musicFor(state: MusicState): MusicTrack | null {
   return p.bossAlive ? 'floorBoss' : 'floorMain'
 }
 
-const MUSIC_VOLUME = 0.4
+/** 預設音樂音量（設定畫面可調）。 */
+const MUSIC_VOLUME = 0.3
 const FADE_MS = 600
 const FADE_STEP_MS = 50
 
@@ -41,6 +42,7 @@ const FADE_STEP_MS = 50
 export class MusicPlayer {
   private readonly elements = new Map<MusicTrack, HTMLAudioElement>()
   private current: MusicTrack | null = null
+  private volume = MUSIC_VOLUME
   private fades = new Map<HTMLAudioElement, ReturnType<typeof setInterval>>()
 
   constructor(private readonly baseUrl: string = import.meta.env.BASE_URL) {}
@@ -55,7 +57,7 @@ export class MusicPlayer {
         el.currentTime = 0
         el.volume = 0
         this.start(el)
-        this.fadeTo(el, MUSIC_VOLUME, false)
+        this.fadeTo(el, this.volume, false)
       }
       return
     }
@@ -63,6 +65,19 @@ export class MusicPlayer {
     const el = this.element(track)
     if (paused && !el.paused) el.pause()
     else if (!paused && el.paused) this.start(el)
+  }
+
+  /** 調整音樂音量（0～1）：正在放的曲子立刻套用。 */
+  setVolume(volume: number): void {
+    this.volume = volume
+    if (!this.current) return
+    const el = this.element(this.current)
+    const fade = this.fades.get(el)
+    if (fade) {
+      clearInterval(fade)
+      this.fades.delete(el)
+    }
+    el.volume = volume
   }
 
   private element(track: MusicTrack): HTMLAudioElement {

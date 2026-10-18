@@ -46,7 +46,7 @@ describe('App flow', () => {
     const { app } = makeApp()
     expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
     press(app, 'up')
-    expect(app.screen).toEqual({ kind: 'title', cursor: 2 })
+    expect(app.screen).toEqual({ kind: 'title', cursor: 3 })
     press(app, 'down')
     expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
   })
@@ -124,7 +124,7 @@ describe('App flow', () => {
     await settle()
     expect(app.nickname).toBe('NEW')
     expect(deps.saveNickname).toHaveBeenCalledWith('NEW')
-    expect(app.screen).toEqual({ kind: 'title', cursor: 2 })
+    expect(app.screen).toEqual({ kind: 'title', cursor: 3 })
   })
 
   it('LEADERBOARD on the title shows the board without a highlight', async () => {

@@ -1,6 +1,7 @@
 import { App } from './app'
 import { MusicPlayer } from './audio/music'
-import { play, unlockAudio } from './audio/sfx'
+import { play, setSfxVolume, unlockAudio } from './audio/sfx'
+import { loadSettings, saveSettings, type Settings } from './settings'
 import { Keyboard } from './engine/keyboard'
 import { startLoop } from './engine/loop'
 import { VIEW_H, VIEW_W } from './game/constants'
@@ -98,7 +99,18 @@ if (import.meta.env.DEV && params.has('scene')) {
     // ?floor=2 直接從 2F 開始（開發用）
     const startFloor = import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0
     const music = new MusicPlayer()
+    const settings = loadSettings()
+    const applySettings = (s: Settings) => {
+      setSfxVolume(s.sfx)
+      music.setVolume(s.music)
+    }
+    applySettings(settings)
     const app = new App({
+      settings,
+      onSettingsChange: (s) => {
+        applySettings(s)
+        saveSettings(s)
+      },
       worldOptions: { mode: 'campaign', startFloor },
       leaderboard: createLeaderboard(),
       askNickname,
