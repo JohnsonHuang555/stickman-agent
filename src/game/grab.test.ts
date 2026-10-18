@@ -5,7 +5,7 @@ import type { Button } from './input/buttons'
 import { SIMULTANEOUS_WINDOW } from './input/commands'
 import { newItem } from './items/itemTypes'
 import { GROUND_Y } from './constants'
-import { frontHand, spinPivot } from './stickman/pose'
+import { frontHand, poseBall, posePoints, spinPivot } from './stickman/pose'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -271,21 +271,41 @@ describe('grab animations (regression for "back + X and space look unnatural")',
     }
   })
 
-  it('giant swing: the enemy is held by the ankles (feet at your hands) and foreshortens as it swings round', () => {
+  it('giant swing: held by the ankles, the head starts on the floor, sweeps up into the air, and the enemy flies up on release', () => {
     const { world, g } = grabbed()
     tick(world, ['jump'])
+    /** 被甩的人頭的中心離地多高（用實際姿勢轉完之後的位置）。 */
+    const headHeight = () => {
+      const pose = g.pose()
+      const pts = posePoints(pose, g.scale)
+      const ball = poseBall(pose, g.scale)
+      const footY = GROUND_Y - g.h
+      const px = g.x + ball.x * g.facing
+      const py = footY - ball.up
+      const [hx, hu] = [(pts[10][0] + pts[11][0]) / 2, (pts[10][1] + pts[11][1]) / 2]
+      const dx = g.x + hx * g.facing - px
+      const dy = footY - hu - py
+      return GROUND_Y - (py + dx * Math.sin(g.rotation) + dy * Math.cos(g.rotation))
+    }
+    const heads: number[] = []
     let minSquash = 1
     for (let i = 1; i < GRAB.swing.releaseAt; i++) {
       tick(world)
       if (i > GRAB.swing.liftFrames) {
+        heads.push(headHeight())
         minSquash = Math.min(minSquash, g.squash?.scale ?? 1)
-        // 身體打橫、頭朝外
-        expect(Math.abs(Math.abs(g.rotation) - Math.PI / 2)).toBeLessThan(0.01)
         expect(g.squash?.originX).toBeCloseTo(hand(world).x)
       }
     }
-    expect(minSquash).toBeLessThan(0.4)
-    run(world, 2)
+    expect(heads[0]).toBeLessThan(6) // 一開始頭拖在地上
+    expect(heads[heads.length - 1]).toBeGreaterThan(GROUND_Y - hand(world).y) // 最後比手還高
+    expect(minSquash).toBeLessThan(0.4) // 轉到前後方時有透視
+    let maxH = 0
+    for (let i = 0; i < 20; i++) {
+      tick(world)
+      maxH = Math.max(maxH, g.h)
+    }
     expect(g.squash).toBeNull()
+    expect(maxH).toBeGreaterThan(30) // 甩到空中
   })
 })

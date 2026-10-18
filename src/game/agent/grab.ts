@@ -18,7 +18,18 @@ export const GRAB = {
   throw: { length: 22, releaseAt: 8 },
   suplex: { length: 30, slamAt: 19 },
   /** 大風車：抓腳踝甩，被甩的人身體長度 bodyLength；前 liftFrames 幀從站著被拉成橫的。 */
-  swing: { length: 50, releaseAt: 40, turns: 2, bodyLength: 40, liftFrames: 6, sweepFrom: 6 },
+  swing: {
+    length: 50,
+    releaseAt: 40,
+    turns: 2,
+    bodyLength: 40,
+    liftFrames: 6,
+    sweepFrom: 6,
+    /** 轉到最快時身體比水平再往上翹的角度（弧度）；一開始頭拖在地上。 */
+    riseAngle: 0.25,
+    /** 甩出去時往上飛的速度。 */
+    releaseLift: 4.5,
+  },
 } as const
 
 export type GrabMove = 'hold' | 'knee' | 'throw' | 'suplex' | 'swing'
@@ -36,7 +47,7 @@ export const GRAB_HITS = {
 } as const
 
 const [clinch] = ATTACK_POSES.clinch
-const [giantSwing] = ATTACK_POSES.giantSwing
+const [swingLow, swingHigh] = ATTACK_POSES.giantSwing
 
 export const GRAB_CLIPS: Record<GrabMove, Clip> = {
   hold: new Clip([{ pose: clinch, dur: 1 }]),
@@ -57,7 +68,11 @@ export const GRAB_CLIPS: Record<GrabMove, Clip> = {
     { pose: ATTACK_POSES.suplex[3], dur: GRAB.suplex.slamAt - 15, blend: GRAB.suplex.slamAt - 15 },
     { pose: POSES.idleA, dur: GRAB.suplex.length - GRAB.suplex.slamAt, blend: 10 },
   ]),
-  swing: new Clip([{ pose: giantSwing, dur: GRAB.swing.length, blend: 4 }]),
+  // 越轉越快，手也越抬越高，把對方從地上甩到空中
+  swing: new Clip([
+    { pose: swingLow, dur: GRAB.swing.liftFrames, blend: 4 },
+    { pose: swingHigh, dur: GRAB.swing.length - GRAB.swing.liftFrames, blend: GRAB.swing.releaseAt - GRAB.swing.liftFrames },
+  ]),
 }
 
 /** 大風車第 frame 幀轉到的角度（弧度）：越轉越快。 */

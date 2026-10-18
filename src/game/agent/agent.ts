@@ -6,7 +6,7 @@ import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, 
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import { CROUCH_HEIGHT, STAND_HEIGHT, frontHand, lerpPose, poseBall, type Pose } from '../stickman/pose'
+import { CROUCH_HEIGHT, STAND_HEIGHT, frontHand, lerpPose, poseBall, posePoints, type Pose } from '../stickman/pose'
 import { CLIPS, POSES, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
@@ -647,6 +647,8 @@ export class Agent extends Fighter {
           target.squash = null
           target.holdAt(target.x, Math.max(target.h, 6), (-this.grabFacing) as Facing, 0)
           this.grabHit(target, GRAB_HITS.swingRelease, this.grabFacing, world)
+          // 從手上往斜上方飛出去
+          target.vh = Math.max(target.vh, GRAB.swing.releaseLift)
         }
         if (f >= GRAB.swing.length) return this.endGrab()
         break
@@ -704,33 +706,81 @@ export class Agent extends Fighter {
   }
 
   /**
-   * 大風車：特務抓著對方腳踝原地轉，被甩的人身體打橫、頭朝外。
+   * 把 g 擺成「雙腳在 (fx, fy)、轉 rotation」：用實際姿勢算出腳和頭轉完之後的位置。
+   * 回傳頭的螢幕座標。apply = false 時只計算不移動（找角度用）。
+   */
+  private hangByFeet(g: Grunt, fx: number, fy: number, facing: Facing, rotation: number, apply: boolean) {
+    const pose = g.pose()
+    const pts = posePoints(pose, g.scale)
+    const ball = poseBall(pose, g.scale)
+    const feet = [(pts[7][0] + pts[9][0]) / 2, (pts[7][1] + pts[9][1]) / 2]
+    const head = [(pts[10][0] + pts[11][0]) / 2, (pts[10][1] + pts[11][1]) / 2]
+    const cos = Math.cos(rotation)
+    const sin = Math.sin(rotation)
+    // 相對身體中心的螢幕向量，轉 rotation（畫布順時針為正）
+    const turned = ([px, up]: number[]) => {
+      const dx = (px - ball.x) * facing
+      const dy = -(up - ball.up)
+      return [dx * cos - dy * sin, dx * sin + dy * cos]
+    }
+    const f = turned(feet)
+    const pivotX = fx - f[0]
+    const pivotY = fy - f[1]
+    const hd = turned(head)
+    if (apply) g.holdAt(pivotX - ball.x * facing, GROUND_Y - (pivotY + ball.up) || 0.001, facing, rotation)
+    return { x: pivotX + hd[0], y: pivotY + hd[1] }
+  }
+
+  /**
+   * 大風車：特務抓著對方腳踝原地轉，被甩的人頭朝外。
+   * 剛開始轉得慢，頭拖在地上；越轉越快，身體從地上掃起來、轉到水平再往上翹，最後甩到空中。
    * 轉到特務前後方時左右壓扁（透視），看起來是繞著特務轉，而不是左右滑。
    */
-  private placeSwung(g: Grunt): void {
+  private swingBody(g: Grunt) {
     const f = this.grabFrame
-    const { bodyLength, liftFrames } = GRAB.swing
-    const cos = Math.cos(swingAngle(f))
-    const out = this.facing // updateGrab 已讓特務面向被甩的人
+    const { liftFrames, releaseAt, riseAngle } = GRAB.swing
     const hand = this.handNow()
-    const len = bodyLength * g.scale
-    const k = Math.min(1, f / liftFrames) // 前幾幀從站著被拉成橫的
-    const holdX = this.x + out * GRAB.distance
-    const holdY = GROUND_Y - poseBall(g.pose(), g.scale).up
-    const cx = holdX + (hand.x + (out * len) / 2 - holdX) * k
-    const cy = holdY + (hand.y - holdY) * k
-    this.centerGrabbed(g, cx, cy, (-out) as Facing, out * (Math.PI / 2) * k)
-    const depth = Math.max(0.18, Math.abs(cos))
+    const out = this.facing // updateGrab 已讓特務面向被甩的人
+    const rotationFor = (droop: number) => out * (Math.PI / 2 + droop)
+    // 頭剛好碰到地板的下垂角度（二分搜尋：越往下垂頭越低）
+    let lo = -riseAngle
+    let hi = 1.5
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) / 2
+      const headY = this.hangByFeet(g, hand.x, hand.y, (-out) as Facing, rotationFor(mid), false).y
+      if (headY < GROUND_Y - 4) lo = mid
+      else hi = mid
+    }
+    const onFloor = lo
+    const speed = Math.min(1, Math.max(0, (f - liftFrames) / (releaseAt - liftFrames)))
+    const eased = speed * speed * (3 - 2 * speed)
+    const droop = onFloor + (-riseAngle - onFloor) * eased
+    const depth = Math.max(0.18, Math.abs(Math.cos(swingAngle(f))))
+    return { hand, out, rotation: rotationFor(droop), depth }
+  }
+
+  private placeSwung(g: Grunt): void {
+    const { hand, out, rotation, depth } = this.swingBody(g)
+    // 前幾幀：腳從地上被拉到特務手上，身體同時往外倒成頭朝外
+    const k = Math.min(1, this.grabFrame / GRAB.swing.liftFrames)
+    const footX = this.x + out * GRAB.distance
+    this.hangByFeet(g, footX + (hand.x - footX) * k, GROUND_Y + (hand.y - GROUND_Y) * k, (-out) as Facing, rotation * k, true)
     g.squash = { scale: 1 + (depth - 1) * k, originX: hand.x }
   }
 
   /** 大風車途中，被甩的人（從手到頭這一段）撞到的其他敵人倒地。 */
   private swingSweep(world: World): void {
     const g = this.grabbed!
-    const hand = this.handNow()
-    const reach = GRAB.swing.bodyLength * g.scale * (g.squash?.scale ?? 1)
-    const x0 = Math.min(hand.x, hand.x + this.facing * reach)
-    const box = { x: x0, y: hand.y - 12, w: reach, h: 24 }
+    const { hand, out, rotation, depth } = this.swingBody(g)
+    const head = this.hangByFeet(g, hand.x, hand.y, (-out) as Facing, rotation, false)
+    const headX = hand.x + (head.x - hand.x) * depth
+    const headY = head.y
+    const box = {
+      x: Math.min(hand.x, headX),
+      y: Math.min(hand.y, headY) - 10,
+      w: Math.abs(headX - hand.x),
+      h: Math.abs(headY - hand.y) + 20,
+    }
     for (const e of world.enemies) {
       if (e === g || this.swingHits.has(e.id) || e.invuln > 0) continue
       const hurt = e.hurtbox()
