@@ -19,6 +19,8 @@ export type Sound =
   | 'gameOver'
   | 'menu'
   | 'select'
+  /** 閃身步閃過攻擊（進入慢動作）。 */
+  | 'dodge'
 
 /**
  * 有音檔的音效與檔名（public/sfx/<檔名>.mp3）。之後放進新的音檔，在這裡加一行即可。
@@ -36,6 +38,8 @@ const SOUND_FILES: Partial<Record<Sound, string>> = {
   pickup: 'pickup',
   heal: 'heal',
   coin: 'coin',
+  menu: 'mode-selecting',
+  select: 'select-mode',
 }
 
 /** 已經解碼好的音檔。 */
@@ -206,6 +210,7 @@ export function play(sound: Sound): void {
       tone('square', 660, 660, 0.04, 0.15)
       break
     case 'select':
+    case 'dodge':
       tone('square', 660, 1320, 0.1, 0.2)
       break
   }

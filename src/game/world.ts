@@ -607,7 +607,7 @@ export class World {
     this.agent.openCounter(enemy, this.realFrame + COUNTER_WINDOW)
     this.slowmo = Math.max(this.slowmo, COUNTER_WINDOW)
     this.counterAt = this.realFrame
-    this.sound('select')
+    this.sound('dodge')
   }
 
   /** 打倒的是魔王，或區段最後一波的最後一個敵人。 */
