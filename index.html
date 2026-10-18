@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>火柴人特務：黑幫大樓</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,10 +14,59 @@
       html, body { margin: 0; height: 100%; background: #0b0b10; overflow: hidden; }
       /* 畫布固定在視窗正中央：不受瀏覽器擴充功能插入頁面的元素影響（用 flex 置中會被擠歪） */
       canvas { display: block; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+
+      /* ── 手機觸控操作 ── */
+      body.touch { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+      #touch-ui { position: fixed; inset: 0; z-index: 5; }
+      #touch-ui .stick-zone { position: absolute; left: 0; top: 0; width: 50%; height: 100%; }
+      #touch-ui .stick-base {
+        position: absolute; left: 18%; top: 72%; width: 104px; height: 104px; margin: -52px 0 0 -52px;
+        border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08);
+        pointer-events: none; opacity: .5; transition: opacity .1s;
+      }
+      #touch-ui .stick-base.active { opacity: 1; }
+      #touch-ui .stick-knob {
+        position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px;
+        border-radius: 50%; background: rgba(255,255,255,.45); box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+      }
+      #touch-ui .tbtn {
+        position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: rgba(20,16,24,.45); border: 2px solid rgba(255,255,255,.55); color: #fff;
+        font: bold 20px/1 system-ui, sans-serif; text-shadow: 0 1px 2px #000;
+      }
+      #touch-ui .tbtn small { font-size: 10px; opacity: .7; margin-top: 2px; }
+      #touch-ui .tbtn.down { background: rgba(245,197,24,.55); border-color: #f5c518; }
+      /* 右手：拳在下、踢在右、抓在上，形成一個好按的弧形 */
+      #touch-ui .tbtn-punch { right: calc(112px + env(safe-area-inset-right)); bottom: 44px; margin: 0 -32px -32px 0; }
+      #touch-ui .tbtn-kick { right: calc(40px + env(safe-area-inset-right)); bottom: 84px; margin: 0 -32px -32px 0; }
+      #touch-ui .tbtn-grab { right: calc(92px + env(safe-area-inset-right)); bottom: 132px; margin: 0 -32px -32px 0; }
+      #touch-ui .tbtn-dodge, #touch-ui .tbtn-bag, #touch-ui .tbtn-desperation {
+        width: 44px; height: 44px; font-size: 14px; margin: 0 -22px -22px 0;
+      }
+      #touch-ui .tbtn-dodge { right: calc(186px + env(safe-area-inset-right)); bottom: 32px; }
+      #touch-ui .tbtn-bag { right: calc(34px + env(safe-area-inset-right)); bottom: 32px; }
+      #touch-ui .tbtn-desperation { right: calc(176px + env(safe-area-inset-right)); bottom: 100px; font-size: 12px; }
+      #touch-ui .tbtn-pause {
+        left: calc(26px + env(safe-area-inset-left)); top: 26px; width: 40px; height: 40px; margin: -20px 0 0 -20px; font-size: 12px;
+      }
+
+      /* 直拿手機：請玩家轉成橫向 */
+      #rotate { display: none; }
+      @media (orientation: portrait) {
+        body.touch #rotate {
+          display: flex; position: fixed; inset: 0; z-index: 20; background: #0b0b10; color: #f5c518;
+          align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+          font: 14px/1.8 "Press Start 2P", monospace; text-align: center; padding: 24px;
+        }
+        body.touch #rotate .icon { font-size: 48px; animation: tilt 1.6s ease-in-out infinite; }
+      }
+      @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
     </style>
   </head>
   <body>
     <canvas id="game" width="480" height="270"></canvas>
+    <div id="rotate"><div class="icon">📱</div><div>請將手機轉成橫向</div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

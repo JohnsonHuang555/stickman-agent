@@ -1,8 +1,10 @@
 import { App } from './app'
+import { useTouchHints } from './game/render/screens'
 import { MusicPlayer } from './audio/music'
 import { play, setSfxVolume, unlockAudio } from './audio/sfx'
 import { loadSettings, saveSettings, type Settings } from './settings'
 import { Keyboard } from './engine/keyboard'
+import { TouchControls, mergeInput, wantsTouchControls } from './engine/touch'
 import { startLoop } from './engine/loop'
 import { VIEW_H, VIEW_W } from './game/constants'
 import { World } from './game/world'
@@ -48,6 +50,19 @@ function createLeaderboard(): Leaderboard {
   return config ? new FallbackLeaderboard(new FirestoreLeaderboard(config), new LocalLeaderboard()) : new LocalLeaderboard()
 }
 
+/** 手機第一次觸碰：解鎖音效，並嘗試全螢幕、鎖定橫向（iOS Safari 不支援時就算了）。 */
+function enterMobileMode(): void {
+  unlockAudio()
+  try {
+    void document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).then(() => {
+      const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
+      return orientation.lock?.('landscape')
+    }).catch(() => {})
+  } catch {
+    // 不支援全螢幕
+  }
+}
+
 function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
   redrawStatic = () => {
     beginFrame()
@@ -75,6 +90,10 @@ if (import.meta.env.DEV && params.has('scene')) {
 } else {
   const keyboard = new Keyboard()
   keyboard.attach(window, unlockAudio)
+  // 手機、平板：顯示觸控按鈕；第一次觸碰時解鎖音效、盡量切到全螢幕橫向
+  const touch = wantsTouchControls(params) ? new TouchControls(enterMobileMode) : null
+  useTouchHints(!!touch)
+  const poll = () => mergeInput(keyboard.poll(), touch?.poll() ?? null)
 
   if (params.has('training')) {
     // 練習場：跳過標題與排行榜
@@ -82,7 +101,7 @@ if (import.meta.env.DEV && params.has('scene')) {
     world.sound = play
     startLoop(
       () => {
-        world.update(keyboard.poll())
+        world.update(poll())
         if (world.restartRequested) {
           world = new World({ mode: 'training' })
           world.sound = play
@@ -119,7 +138,7 @@ if (import.meta.env.DEV && params.has('scene')) {
       onDialogClosed: () => keyboard.clear(),
     })
     startLoop(
-      () => app.update(keyboard.poll()),
+      () => app.update(poll()),
       () => {
         beginFrame()
         app.render(ctx)

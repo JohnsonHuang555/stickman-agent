@@ -7,6 +7,12 @@ import { ATTACK_POSES } from '../stickman/poses'
 import { drawBackground } from './background'
 import { text } from './hud'
 
+/** 用觸控操作時，畫面上的提示改成觸控按鈕的說法。 */
+let touchHints = false
+export function useTouchHints(on: boolean): void {
+  touchHints = on
+}
+
 export const TITLE_MENU = ['START', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
 /** 從標題進入的設定畫面：DONE 顯示為 BACK。 */
 export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
@@ -43,7 +49,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nicknam
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('W S 選擇   J / ENTER 確定', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText(touchHints ? '搖桿上下選擇   拳 確定' : 'W S 選擇   J / ENTER 確定', VIEW_W / 2, VIEW_H - 6)
 }
 
 export function drawLeaderboard(
@@ -85,7 +91,7 @@ export function drawLeaderboard(
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('J / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText(touchHints ? '拳 返回' : 'J / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
 }
 
 /**
@@ -155,5 +161,12 @@ export function drawSettings(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText(overlay ? 'W S 選擇   A D 調整音量   J 確定   P／ESC 繼續遊戲' : 'W S 選擇   A D 調整音量   J 確定   ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  if (touchHints) {
+    ctx.fillText(overlay ? '搖桿上下選擇   左右調整音量   拳 確定   ❚❚ 繼續遊戲' : '搖桿上下選擇   左右調整音量   拳 確定   ❚❚ 返回', VIEW_W / 2, VIEW_H - 6)
+    // 操作說明是鍵盤的按鍵：補一行手機按鈕的對照
+    ctx.fillStyle = '#f5c518'
+    ctx.fillText('手機：搖桿 = W A S D（往上 = 跳）   拳 = J   踢 = K   抓 = L   閃 = Shift   包 = V   保命 = J+K+L', VIEW_W / 2, VIEW_H - 18)
+  } else {
+    ctx.fillText(overlay ? 'W S 選擇   A D 調整音量   J 確定   P／ESC 繼續遊戲' : 'W S 選擇   A D 調整音量   J 確定   ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  }
 }
