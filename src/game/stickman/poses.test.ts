@@ -155,3 +155,10 @@ describe('run cycle (regression for "the running animation looks odd")', () => {
     expect(jog.legF[0]).toBeLessThan(sprint.legF[0])
   })
 })
+
+describe('run arm swing (regression for "the arms should swing more")', () => {
+  it('at full speed each upper arm sweeps at least 170° front to back', () => {
+    const ups = Array.from({ length: 60 }, (_, i) => runPose(i / 60, 1).armF[0])
+    expect(Math.max(...ups) - Math.min(...ups)).toBeGreaterThanOrEqual(170)
+  })
+})

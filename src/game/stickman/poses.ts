@@ -114,8 +114,8 @@ const JOG: RunShape = {
   kneeBack: 18,
   kneeRecover: 85,
   kneeStance: 12,
-  armForward: [25, 115],
-  armBack: [-35, 45],
+  armForward: [45, 130],
+  armBack: [-60, 20],
 }
 
 const SPRINT: RunShape = {
@@ -126,8 +126,9 @@ const SPRINT: RunShape = {
   kneeBack: 22,
   kneeRecover: 115,
   kneeStance: 15,
-  armForward: [45, 120],
-  armBack: [-90, -10],
+  // 手擺得大：往前時手到臉的高度，往後時上臂甩過水平
+  armForward: [75, 150],
+  armBack: [-110, -30],
 }
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
