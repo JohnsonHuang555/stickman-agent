@@ -6,7 +6,7 @@ import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, 
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import { CROUCH_HEIGHT, STAND_HEIGHT, lerpPose, type Pose } from '../stickman/pose'
+import { CROUCH_HEIGHT, STAND_HEIGHT, frontHand, lerpPose, poseBall, type Pose } from '../stickman/pose'
 import { CLIPS, POSES, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
@@ -564,6 +564,7 @@ export class Agent extends Fighter {
 
   /** 放開抓著的人（被打、抓太久）。 */
   private releaseGrab(): void {
+    if (this.grabbed) this.grabbed.squash = null
     this.grabbed?.breakFree(this.x)
     this.grabbed = null
   }
@@ -624,8 +625,9 @@ export class Agent extends Fighter {
         if (this.grabFrame === GRAB.suplex.slamAt && this.grabbed) {
           const target = this.grabbed
           this.grabbed = null
-          target.holdAt(this.x - this.grabFacing * GRAB.distance, 0, this.grabFacing, 0)
           this.grabHit(target, GRAB_HITS.suplex, (-this.grabFacing) as Facing, world)
+          // 背部著地直接倒下，不會再被彈飛
+          target.slamDown((-this.grabFacing) as Facing)
           world.quake(4)
         }
         if (this.grabFrame >= GRAB.suplex.length) return this.endGrab()
@@ -642,7 +644,8 @@ export class Agent extends Fighter {
           this.facing = this.grabFacing
           const target = this.grabbed
           this.grabbed = null
-          target.holdAt(this.x + this.grabFacing * GRAB.swing.radius, GRAB.swing.height, (-this.grabFacing) as Facing, 0)
+          target.squash = null
+          target.holdAt(target.x, Math.max(target.h, 6), (-this.grabFacing) as Facing, 0)
           this.grabHit(target, GRAB_HITS.swingRelease, this.grabFacing, world)
         }
         if (f >= GRAB.swing.length) return this.endGrab()
@@ -652,29 +655,16 @@ export class Agent extends Fighter {
     this.placeGrabbed()
   }
 
-  /** 依目前的抓技動作，把抓著的人擺到該在的位置。 */
+  /** 依目前的抓技動作，把抓著的人擺到該在的位置。過肩摔與大風車時跟著特務的手走。 */
   private placeGrabbed(): void {
     const g = this.grabbed
     if (!g) return
-    const side = this.grabFacing
+    g.squash = null
     switch (this.grabMove) {
-      case 'suplex': {
-        // 從面前沿著頭頂的弧線舉到身後
-        const { liftFrom, slamAt, radius, height } = GRAB.suplex
-        const t = Math.min(1, Math.max(0, (this.grabFrame - liftFrom) / (slamAt - liftFrom)))
-        const a = Math.PI * t * t * (3 - 2 * t)
-        g.holdAt(this.x + side * Math.cos(a) * radius, Math.sin(a) * height, (-side) as Facing, side * a)
-        return
-      }
-      case 'swing': {
-        const a = swingAngle(this.grabFrame)
-        const { radius, height } = GRAB.swing
-        // 被甩的人身體打橫、頭朝外
-        const x = this.x + side * Math.cos(a) * radius
-        const out: Facing = x >= this.x ? 1 : -1
-        g.holdAt(x, height, (-out) as Facing, out * (Math.PI / 2))
-        return
-      }
+      case 'suplex':
+        return this.placeSuplexed(g)
+      case 'swing':
+        return this.placeSwung(g)
       case 'knee': {
         const lifted = this.grabFrame >= GRAB.knee.hitAt && this.grabFrame < GRAB.knee.hitAt + 4
         g.holdAt(this.x + this.facing * GRAB.distance, lifted ? 3 : 0, (-this.facing) as Facing, 0)
@@ -685,10 +675,62 @@ export class Agent extends Fighter {
     }
   }
 
-  /** 大風車途中，被甩的人撞到的其他敵人倒地。 */
+  /** 特務這一幀的前手位置與前臂方向（螢幕座標）。 */
+  private handNow() {
+    return frontHand(this.pose(), this.x, GROUND_Y - this.h, this.facing, this.scale)
+  }
+
+  /** 把 g 的身體中心擺到螢幕座標 (cx, cy)，並轉 rotation。 */
+  private centerGrabbed(g: Grunt, cx: number, cy: number, facing: Facing, rotation: number): void {
+    const ball = poseBall(g.pose(), g.scale)
+    // 身體中心不低於地面上方 8px（摔下那一刻由命中處理接手）
+    const y = Math.min(cy, GROUND_Y - 8)
+    g.holdAt(cx - ball.x * facing, Math.max(0.5, GROUND_Y - y - ball.up), facing, rotation)
+  }
+
+  /**
+   * 過肩摔：被摔的人抓在特務手上，身體中心在前臂延長線上；
+   * 手從前方舉過頭頂再往後放下時，被摔的人跟著繞過頭頂、頭下腳上落到身後。
+   */
+  private placeSuplexed(g: Grunt): void {
+    const side = this.grabFacing
+    const hand = this.handNow()
+    const reach = 10 * g.scale
+    // 前臂角度（0 = 往下、90 = 往前、180 = 往上）連續展開：抓腰時約 90°，摔下時約 285°
+    const fore = this.pose().armF[1]
+    const unwrapped = ((((fore - 60) % 360) + 360) % 360) + 60
+    const turn = ((unwrapped - 95) * Math.PI) / 180
+    this.centerGrabbed(g, hand.x + hand.dx * reach, hand.y + hand.dy * reach, (-side) as Facing, -side * Math.max(0, turn))
+  }
+
+  /**
+   * 大風車：特務抓著對方腳踝原地轉，被甩的人身體打橫、頭朝外。
+   * 轉到特務前後方時左右壓扁（透視），看起來是繞著特務轉，而不是左右滑。
+   */
+  private placeSwung(g: Grunt): void {
+    const f = this.grabFrame
+    const { bodyLength, liftFrames } = GRAB.swing
+    const cos = Math.cos(swingAngle(f))
+    const out = this.facing // updateGrab 已讓特務面向被甩的人
+    const hand = this.handNow()
+    const len = bodyLength * g.scale
+    const k = Math.min(1, f / liftFrames) // 前幾幀從站著被拉成橫的
+    const holdX = this.x + out * GRAB.distance
+    const holdY = GROUND_Y - poseBall(g.pose(), g.scale).up
+    const cx = holdX + (hand.x + (out * len) / 2 - holdX) * k
+    const cy = holdY + (hand.y - holdY) * k
+    this.centerGrabbed(g, cx, cy, (-out) as Facing, out * (Math.PI / 2) * k)
+    const depth = Math.max(0.18, Math.abs(cos))
+    g.squash = { scale: 1 + (depth - 1) * k, originX: hand.x }
+  }
+
+  /** 大風車途中，被甩的人（從手到頭這一段）撞到的其他敵人倒地。 */
   private swingSweep(world: World): void {
     const g = this.grabbed!
-    const box = { x: g.x - 14, y: GROUND_Y - g.h - 34, w: 28, h: 34 }
+    const hand = this.handNow()
+    const reach = GRAB.swing.bodyLength * g.scale * (g.squash?.scale ?? 1)
+    const x0 = Math.min(hand.x, hand.x + this.facing * reach)
+    const box = { x: x0, y: hand.y - 12, w: reach, h: 24 }
     for (const e of world.enemies) {
       if (e === g || this.swingHits.has(e.id) || e.invuln > 0) continue
       const hurt = e.hurtbox()

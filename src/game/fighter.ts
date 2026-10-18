@@ -148,6 +148,8 @@ export abstract class Fighter implements Hitter {
 
   /** 慢動作時畫在兩個模擬幀之間的位置與姿勢；null 就照目前狀態畫。 */
   display: FighterDisplay | null = null
+  /** 左右壓扁（大風車轉到前後方時的透視）：以世界座標 originX 為中心水平縮放。 */
+  squash: { scale: number; originX: number } | null = null
 
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
     const d = this.display
@@ -164,6 +166,12 @@ export abstract class Fighter implements Hitter {
     const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
     const footY = GROUND_Y - h
     ctx.save()
+    if (this.squash) {
+      const ox = this.squash.originX - camX
+      ctx.translate(ox, 0)
+      ctx.scale(this.squash.scale, 1)
+      ctx.translate(-ox, 0)
+    }
     if (rotation) {
       // 把姿勢當成一顆球，繞它自己的中心轉；在地上翻滾時中心抬到離地一個半徑，
       // 最低點剛好貼著地面滾，不會被甩到半空或陷進地裡

@@ -61,6 +61,8 @@ if (import.meta.env.DEV && params.has('scene')) {
   import('./dev/bossGallery').then(({ drawBossGallery }) => showStatic(drawBossGallery))
 } else if (import.meta.env.DEV && params.has('items')) {
   import('./dev/itemGallery').then(({ drawItemGallery }) => showStatic(drawItemGallery))
+} else if (import.meta.env.DEV && params.has('grabs')) {
+  import('./dev/grabStrip').then(({ makeStrip }) => showStatic(makeStrip(params.get('grabs')!)))
 } else if (import.meta.env.DEV && params.has('poses')) {
   import('./dev/poseGallery').then(({ drawPoseGallery }) => showStatic(drawPoseGallery))
 } else {

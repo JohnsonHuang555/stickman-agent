@@ -4,6 +4,8 @@ import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
 import { SIMULTANEOUS_WINDOW } from './input/commands'
 import { newItem } from './items/itemTypes'
+import { GROUND_Y } from './constants'
+import { frontHand, spinPivot } from './stickman/pose'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -239,5 +241,51 @@ describe('grab moves', () => {
     run(world, GRAB.knee.length + 2)
     expect(world.score).toBeGreaterThan(score0)
     expect(world.combo.count).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('grab animations (regression for "back + X and space look unnatural")', () => {
+  const center = (g: Grunt) => {
+    const p = spinPivot(g.pose(), g.x, GROUND_Y - g.h, g.facing, g.scale, g.rotation, g.h === 0)
+    return { x: p.pivotX, y: p.pivotY - p.lift }
+  }
+  const hand = (world: World) => frontHand(world.agent.pose(), world.agent.x, GROUND_Y - world.agent.h, world.agent.facing)
+
+  it('over-the-shoulder throw: the enemy stays in your hands the whole way over, then lies flat behind you', () => {
+    const { world, g } = grabbed()
+    tick(world, ['kick'], ['left'])
+    let maxGap = 0
+    for (let i = 1; i < GRAB.suplex.slamAt; i++) {
+      tick(world)
+      const c = center(g)
+      const h = hand(world)
+      maxGap = Math.max(maxGap, Math.hypot(c.x - h.x, c.y - h.y))
+    }
+    expect(maxGap).toBeLessThan(16 * g.scale)
+    run(world, 2)
+    // 摔下之後：背部著地躺在特務身後，不會再飄起來
+    for (let i = 0; i < 20; i++) {
+      tick(world)
+      expect(g.h).toBe(0)
+      expect(g.x).toBeLessThan(world.agent.x)
+    }
+  })
+
+  it('giant swing: the enemy is held by the ankles (feet at your hands) and foreshortens as it swings round', () => {
+    const { world, g } = grabbed()
+    tick(world, ['jump'])
+    let minSquash = 1
+    for (let i = 1; i < GRAB.swing.releaseAt; i++) {
+      tick(world)
+      if (i > GRAB.swing.liftFrames) {
+        minSquash = Math.min(minSquash, g.squash?.scale ?? 1)
+        // 身體打橫、頭朝外
+        expect(Math.abs(Math.abs(g.rotation) - Math.PI / 2)).toBeLessThan(0.01)
+        expect(g.squash?.originX).toBeCloseTo(hand(world).x)
+      }
+    }
+    expect(minSquash).toBeLessThan(0.4)
+    run(world, 2)
+    expect(g.squash).toBeNull()
   })
 })

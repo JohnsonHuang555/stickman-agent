@@ -494,6 +494,17 @@ export class Grunt extends Enemy {
     this.rotation = rotation
   }
 
+  /** 被過肩摔砸在地上：直接背部著地倒下（不會再彈起來飛）。 */
+  slamDown(dir: Facing): void {
+    this.rotation = 0
+    this.spin = 0
+    this.h = 0
+    this.vh = 0
+    this.vx = dir * 0.8
+    this.squash = null
+    this.setState('down')
+  }
+
   /** 掙脫（抓太久、特務被打）：往後退開，短暫硬直。 */
   breakFree(awayFrom: number): void {
     if (this.state !== 'grabbed') return

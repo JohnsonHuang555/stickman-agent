@@ -1,6 +1,6 @@
 import type { HitSpec } from '../combat/types'
 import { Clip } from '../stickman/clip'
-import { ATTACK_POSES } from '../stickman/poses'
+import { ATTACK_POSES, POSES } from '../stickman/poses'
 
 /**
  * 抓技（空手、腳邊沒東西時，在雜兵面前按 C 抓住）：
@@ -16,8 +16,9 @@ export const GRAB = {
   distance: 14,
   knee: { length: 16, hitAt: 5, max: 3 },
   throw: { length: 22, releaseAt: 8 },
-  suplex: { length: 34, liftFrom: 3, slamAt: 19, radius: 18, height: 42 },
-  swing: { length: 50, releaseAt: 40, turns: 2, radius: 24, height: 10, sweepFrom: 6 },
+  suplex: { length: 30, slamAt: 19 },
+  /** 大風車：抓腳踝甩，被甩的人身體長度 bodyLength；前 liftFrames 幀從站著被拉成橫的。 */
+  swing: { length: 50, releaseAt: 40, turns: 2, bodyLength: 40, liftFrames: 6, sweepFrom: 6 },
 } as const
 
 export type GrabMove = 'hold' | 'knee' | 'throw' | 'suplex' | 'swing'
@@ -48,9 +49,13 @@ export const GRAB_CLIPS: Record<GrabMove, Clip> = {
     { pose: ATTACK_POSES.grabThrow[0], dur: GRAB.throw.releaseAt - 2, blend: 4 },
     { pose: ATTACK_POSES.grabThrow[1], dur: GRAB.throw.length - GRAB.throw.releaseAt + 2, blend: 2 },
   ]),
+  // 沉身 → 舉過頭 → 往後仰 → 摔下（第 slamAt 幀落地）→ 站回來
   suplex: new Clip([
-    { pose: ATTACK_POSES.suplex[0], dur: 9, blend: 6 },
-    { pose: ATTACK_POSES.suplex[1], dur: GRAB.suplex.length - 9, blend: GRAB.suplex.slamAt - 9 },
+    { pose: ATTACK_POSES.suplex[0], dur: 4, blend: 4 },
+    { pose: ATTACK_POSES.suplex[1], dur: 6, blend: 6 },
+    { pose: ATTACK_POSES.suplex[2], dur: 5, blend: 5 },
+    { pose: ATTACK_POSES.suplex[3], dur: GRAB.suplex.slamAt - 15, blend: GRAB.suplex.slamAt - 15 },
+    { pose: POSES.idleA, dur: GRAB.suplex.length - GRAB.suplex.slamAt, blend: 10 },
   ]),
   swing: new Clip([{ pose: giantSwing, dur: GRAB.swing.length, blend: 4 }]),
 }
