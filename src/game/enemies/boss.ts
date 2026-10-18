@@ -182,6 +182,7 @@ export class Boss extends Enemy {
         break
     }
 
+    if (this.state === 'stalk') this.stopAtWall(world)
     if (this.applyPhysics(world) && this.state === 'launched') {
       this.setState('down')
       this.vx *= 0.4

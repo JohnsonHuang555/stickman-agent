@@ -18,6 +18,8 @@ const RETREAT_FRAMES = 18
 const PICKUP_FRAMES = 12
 /** 會走去撿東西的最遠距離。 */
 const FETCH_RADIUS = 160
+/** 離物件這麼近就撿得起來。 */
+const PICKUP_REACH = 6
 const AMMO_DROP_CHANCE = 0.15
 const MEDKIT_DROP_CHANCE = 0.1
 /** 同一次浮空最多被打幾下，之後一定落地。 */
@@ -218,6 +220,10 @@ export class Grunt extends Enemy {
         break
     }
 
+    // 自己走路（等待、靠近、後退、撿東西）時不會往牆裡硬走
+    if (this.state === 'wait' || this.state === 'approach' || this.state === 'retreat' || this.state === 'fetch') {
+      this.stopAtWall(world)
+    }
     if (this.applyPhysics(world)) {
       if (this.spiked) {
         // 被下砸踢砸到地上：反彈一次再倒地
@@ -287,6 +293,7 @@ export class Grunt extends Enemy {
     let best: ItemEntity | null = null
     for (const item of world.items) {
       if (!item.pickable || (item.reservedBy !== null && item.reservedBy !== this.id)) continue
+      if (!this.canReach(item, world)) continue // 鎖定畫面外的東西走不到，不要對著牆走
       if (!this.def.pickups.includes(categoryOf(item.item))) continue
       if (categoryOf(item.item) === 'firearm' && item.item.uses <= 0) continue // 空槍不撿
       const d = Math.abs(item.x - this.x)
@@ -301,20 +308,26 @@ export class Grunt extends Enemy {
 
   private updateFetch(world: World): void {
     const item = this.target
-    if (!item || !item.pickable || this.held) {
+    if (!item || !item.pickable || this.held || !this.canReach(item, world)) {
       this.dropReservation()
       this.setState('wait')
       return
     }
     const dx = item.x - this.x
     this.facing = dx < 0 ? -1 : 1
-    if (Math.abs(dx) <= 6) {
+    if (Math.abs(dx) <= PICKUP_REACH) {
       this.dropReservation()
       world.takeItem(item, this)
       this.setState('pickup')
     } else {
       this.vx = this.facing * this.def.walkSpeed
     }
+  }
+
+  /** 走得到（撿得起來）的物件：在可走範圍內，或離邊界不超過撿取距離。 */
+  private canReach(item: ItemEntity, world: World): boolean {
+    const { left, right } = this.walkBounds(world)
+    return item.x >= left - PICKUP_REACH && item.x <= right + PICKUP_REACH
   }
 
   private dropReservation(): void {
