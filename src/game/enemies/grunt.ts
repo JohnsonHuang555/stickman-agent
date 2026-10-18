@@ -57,6 +57,7 @@ type GruntState =
   | 'fetch'
   | 'pickup'
   | 'hurt'
+  | 'groin'
   | 'grabbed'
   | 'launched'
   | 'juggled'
@@ -198,6 +199,10 @@ export class Grunt extends Enemy {
         if (this.stateFrame >= PICKUP_FRAMES) this.setState('wait')
         break
       case 'hurt':
+        this.vx *= 0.8
+        if (this.stateFrame >= this.hitstun) this.setState('wait')
+        break
+      case 'groin':
         this.vx *= 0.8
         if (this.stateFrame >= this.hitstun) this.setState('wait')
         break
@@ -400,6 +405,14 @@ export class Grunt extends Enemy {
     this.planned = null
     this.facing = (-dir) as Facing
 
+    // 踢到下體：摀著下體彎腰（在空中、浮空中照一般受擊處理）
+    if (spec.groin && !this.life.isDead && !this.airborne && this.state !== 'juggled') {
+      this.setState('groin')
+      this.hitstun = spec.hitstun
+      this.vx = dir * spec.knockback
+      return
+    }
+
     if (!this.life.isDead && this.handleJuggle(spec, dir, world)) return
 
     if (spec.knockdown || this.life.isDead) {
@@ -469,7 +482,7 @@ export class Grunt extends Enemy {
   /** 抓得住：站在地上的雜兵（走路、等待、出招、硬直中都可以）；浮空、倒地、起身中抓不到。 */
   get grabbable(): boolean {
     const s = this.state
-    const standing = s === 'wait' || s === 'approach' || s === 'attack' || s === 'retreat' || s === 'fetch' || s === 'pickup' || s === 'hurt'
+    const standing = s === 'wait' || s === 'approach' || s === 'attack' || s === 'retreat' || s === 'fetch' || s === 'pickup' || s === 'hurt' || s === 'groin'
     return standing && !this.airborne && !this.life.isDead
   }
 
@@ -560,6 +573,8 @@ export class Grunt extends Enemy {
       case 'hurt':
       case 'grabbed':
         return this.heldPose ?? CLIPS.hurt.sample(0)
+      case 'groin':
+        return CLIPS.groin.sample(this.stateFrame)
       case 'launched':
       case 'juggled':
         return CLIPS.launched.sample(0)

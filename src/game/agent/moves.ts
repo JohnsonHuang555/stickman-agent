@@ -18,6 +18,9 @@ const punchStep = (f: Fighter, frame: number) => {
 const RUN_KICK_SPEED = 4.2
 const RUN_KICK_HOP = 3.4
 
+/** 被踢到下體後摀著彎腰的幀數（約 1.3 秒）。 */
+export const GROIN_STUN = 80
+
 /** 挑空技把雜兵打上空中的初速。 */
 // 搭配浮空上升重力 0.22：最高約 71px，接近特務跳躍的最高點
 export const LAUNCH_VELOCITY = 5.6
@@ -209,6 +212,20 @@ export const MOVES = {
     onStart: (f) => {
       f.vx = f.facing * RUN_KICK_SPEED
       f.vh = RUN_KICK_HOP
+    },
+  },
+  /** 快速連按兩下 X：往前上方踢下體。傷害小，但雜兵會摀著下體彎腰很久。 */
+  groinKick: {
+    clip: attackClip(ATTACK_POSES.groinKick, 3, 4, 12),
+    length: 19,
+    hit: {
+      from: 3,
+      to: 6,
+      box: { forward: 2, up: 14, w: 30, h: 12 },
+      damage: 4,
+      hitstun: GROIN_STUN,
+      knockback: 0.3,
+      groin: true,
     },
   },
   /** ↓+Z：蹲著出拳，腿不動、身體維持低姿勢，可以連按。 */

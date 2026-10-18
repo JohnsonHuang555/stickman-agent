@@ -36,6 +36,8 @@ export interface HitSpec {
   launch?: number
   /** 下砸：把空中的雜兵往下打，著地時反彈。 */
   spike?: boolean
+  /** 踢到下體：雜兵摀著下體彎腰硬直（Boss 不受影響）。 */
+  groin?: boolean
 }
 
 /** 這一幀正在生效的攻擊判定。 */

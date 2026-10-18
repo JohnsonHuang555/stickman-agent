@@ -15,6 +15,7 @@ export type CommandKind =
   | 'sweep'
   | 'crouchPunch'
   | 'runKick'
+  | 'groinKick'
 
 export interface Command {
   kind: CommandKind
@@ -27,6 +28,8 @@ export const SIMULTANEOUS_WINDOW = 3
 const DESPERATION_BUTTONS: readonly Button[] = ['punch', 'kick', 'grab']
 /** 雙擊方向鍵的間隔上限，以及第二擊到出拳的間隔上限。 */
 export const DOUBLE_TAP_WINDOW = 14
+/** 快速連按兩下 X（間隔不超過這麼多幀）就踢下體。 */
+export const DOUBLE_KICK_WINDOW = 10
 
 export interface CommandContext {
   frame: number
@@ -73,7 +76,10 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   // 蹲著：Z 蹲拳（腿不動）、X 掃腿（不會站起來）
   if (ctx.crouching) return { kind: kick ? 'sweep' : 'crouchPunch' }
   if (ctx.running) return kick ? { kind: 'runKick', dir: ctx.running } : { kind: 'dashPunch', dir: ctx.running }
-  if (kick) return { kind: 'kick' }
+  if (kick) {
+    const kickedJustNow = ctx.presses.some((p) => p.button === 'kick' && p.frame < ctx.frame && ctx.frame - p.frame <= DOUBLE_KICK_WINDOW)
+    return { kind: kickedJustNow ? 'groinKick' : 'kick' }
+  }
   if (ctx.up) return { kind: 'launcher' }
 
   const dir = doubleTapDirection(ctx.presses, ctx.frame)

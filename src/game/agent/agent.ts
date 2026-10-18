@@ -19,6 +19,8 @@ const WALK_SPEED = 2.1
 const RUN_SPEED = 3.2
 /** 起跑後幾幀從小跑步加速到全速（速度、步伐、擺手、前傾一起增加）。 */
 const RUN_RAMP_FRAMES = 24
+/** 踢腿在這一幀之前再按 X，可以改成踢下體（踢腿第 6 幀才踢出去）。 */
+const GROIN_CANCEL_FRAME = 10
 /** 第二下按下後幾幀內還按著同方向，就開始跑。 */
 const RUN_START_WINDOW = 6
 /** 搬著櫃子時的移動速度倍率。 */
@@ -70,6 +72,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   sweep: 'sweep',
   crouchPunch: 'crouchPunch',
   runKick: 'runKick',
+  groinKick: 'groinKick',
 }
 
 type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
@@ -283,6 +286,13 @@ export class Agent extends Fighter {
     if (act.frame <= JUMP_ATTACK_WINDOW) {
       const kind = act.def === MOVES.punch1 ? 'punch' : act.def === MOVES.kick ? 'kick' : null
       if (kind && this.tryJumpAttack(kind, now)) return
+    }
+
+    // 第一下踢腿還沒踢出去就再按 X：改成踢下體
+    if (cmd?.kind === 'groinKick' && act.def === MOVES.kick && act.frame <= GROIN_CANCEL_FRAME) {
+      this.buffered = null
+      this.startAction(MOVES.groinKick)
+      return
     }
 
     // 拳腳打中後的收招可以按 C 直接抓住面前的敵人
