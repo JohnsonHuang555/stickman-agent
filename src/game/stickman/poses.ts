@@ -45,6 +45,8 @@ export const POSES = {
    */
   groinA: P(50, [-60, 5], [-55, 10], [30, -10], [20, -20]),
   groinB: P(46, [-62, 3], [-57, 8], [32, -8], [18, -22]),
+  /** 痛到原地小跳一下：膝蓋往上縮、整個人離地。 */
+  groinHop: P(44, [-58, 8], [-53, 12], [50, -10], [40, -25], 6),
   /** 翻滾時縮成一團：膝蓋往前收、雙手往前抱住小腿（軀幹和大腿要分開，轉起來才不會像一根棍子）。 */
   tuck: P(30, [60, 110], [50, 100], [95, -60], [85, -70]),
 } as const
@@ -219,11 +221,14 @@ export const CLIPS = {
   hurt: still(POSES.hurt),
   launched: still(POSES.launched),
   lying: still(POSES.lying),
-  /** 摀著下體發抖。 */
+  /** 摀著下體：痛到跳一下、落地，再發抖一下，一直重複。 */
   groin: new Clip(
     [
-      { pose: POSES.groinA, dur: 5, blend: 3 },
-      { pose: POSES.groinB, dur: 5, blend: 3 },
+      { pose: POSES.groinA, dur: 3, blend: 3 },
+      { pose: POSES.groinHop, dur: 5, blend: 5 },
+      { pose: POSES.groinA, dur: 5, blend: 5 },
+      { pose: POSES.groinB, dur: 4, blend: 3 },
+      { pose: POSES.groinA, dur: 4, blend: 3 },
     ],
     true,
   ),

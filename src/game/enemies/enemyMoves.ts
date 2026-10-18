@@ -1,6 +1,9 @@
 import type { ActionDef } from '../combat/types'
 import { ATTACK_POSES, attackClip } from '../stickman/poses'
 
+/** 特務被踢到下體時摀著彎腰的幀數（比雜兵短，約 0.75 秒）。 */
+export const AGENT_GROIN_STUN = 45
+
 export interface EnemyMove extends ActionDef {
   /** 與特務距離小於此值才會出這招。 */
   range: number
@@ -20,6 +23,13 @@ export const ENEMY_MOVES = {
     length: 32,
     range: 28,
     hit: { from: 14, to: 17, box: { forward: 4, up: 12, w: 22, h: 12 }, damage: 10, hitstun: 20, knockback: 2.2 },
+  },
+  /** 往前上方踢特務的下體：起手和踢腿一樣長，看得出來；蹲下躲不掉，要跳開或先打斷。 */
+  groinKick: {
+    clip: attackClip(ATTACK_POSES.groinKick, 14, 4, 12, undefined, 8),
+    length: 30,
+    range: 26,
+    hit: { from: 14, to: 17, box: { forward: 2, up: 14, w: 24, h: 12 }, damage: 5, hitstun: AGENT_GROIN_STUN, knockback: 0.3, groin: true },
   },
   thrust: {
     clip: attackClip(ATTACK_POSES.dashPunch, 16, 10, 14, undefined, 10),

@@ -44,7 +44,7 @@ const LAND_FRAMES = 4
 /** 換姿勢時的補間幀數。 */
 const POSE_BLEND = 6
 /** 換到這些姿勢不補間：出招、被打要立刻看得出來。 */
-const SNAP_POSES = new Set(['action', 'hurt', 'launched', 'down'])
+const SNAP_POSES = new Set(['action', 'hurt', 'groin', 'launched', 'down'])
 /** 垂直速度在 ±這個值之間時，從上升姿勢轉成下落姿勢（約 11 幀）。 */
 const APEX_BLEND_SPEED = 2
 const DOWN_FRAMES = 40
@@ -75,7 +75,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   groinKick: 'groinKick',
 }
 
-type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
+type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'groin' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
 
 export class Agent extends Fighter {
   readonly team = 'agent' as const
@@ -183,6 +183,7 @@ export class Agent extends Fighter {
         if (this.stateFrame >= PICKUP_FRAMES) this.setState('free')
         break
       case 'hurt':
+      case 'groin':
         this.vx *= 0.82
         if (this.stateFrame >= this.hitstun) this.setState('free')
         break
@@ -564,6 +565,11 @@ export class Agent extends Fighter {
       this.setState('launched')
       this.vx = dir * 2.4
       this.vh = 3.4
+    } else if (spec.groin && !this.airborne) {
+      // 被踢到下體：摀著彎腰、痛到跳，這段時間不能動
+      this.setState('groin')
+      this.hitstun = spec.hitstun
+      this.vx = dir * spec.knockback
     } else {
       this.setState('hurt')
       this.hitstun = spec.hitstun
@@ -890,6 +896,8 @@ export class Agent extends Fighter {
         return CLIPS.pickup.sample(0)
       case 'hurt':
         return CLIPS.hurt.sample(0)
+      case 'groin':
+        return CLIPS.groin.sample(this.stateFrame)
       case 'launched':
         return CLIPS.launched.sample(0)
       case 'down':

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GROIN_STUN, MOVES } from './agent/moves'
+import { AGENT_GROIN_STUN } from './enemies/enemyMoves'
 import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
 import { SIMULTANEOUS_WINDOW } from './input/commands'
@@ -109,5 +110,75 @@ describe('groin kick (double-tap X)', () => {
     run(world, 20)
     expect(hp - boss.life.hp).toBe(MOVES.groinKick.hit.damage)
     expect(boss.pose().lean).toBeLessThan(40)
+  })
+})
+
+describe('enemies can groin-kick the agent too', () => {
+  function kickedAgent() {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    world.agent.life.hp = 99999
+    const g = new Grunt(320, 'thug', { moves: ['groinKick'] })
+    world.enemies = [g]
+    let frames = 0
+    for (; frames < 600 && world.agent.pose().lean <= 40; frames++) tick(world)
+    return { world, g, frames }
+  }
+
+  it('the agent doubles over clutching the groin and cannot move until it wears off', () => {
+    const { world, frames } = kickedAgent()
+    expect(frames).toBeLessThan(600)
+    const pts = posePoints(world.agent.pose())
+    const [hipX, hipUp] = pts[0]
+    for (const hand of [pts[3], pts[5]]) {
+      expect(Math.abs(hand[0] - hipX)).toBeLessThan(8)
+      expect(Math.abs(hand[1] - hipUp)).toBeLessThan(8)
+    }
+    const x0 = world.agent.x
+    for (let i = 0; i < AGENT_GROIN_STUN - 10; i++) tick(world, [], ['left'])
+    expect(Math.abs(world.agent.x - x0)).toBeLessThan(3) // 摀著下體時不能走
+    for (let i = 0; i < 30; i++) tick(world, [], ['left'])
+    expect(world.agent.x).toBeLessThan(x0 - 10) // 恢復後可以走了
+  })
+
+  it('jumping over it avoids the groin kick', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    const g = new Grunt(320, 'thug', { moves: ['groinKick'] })
+    world.enemies = [g]
+    for (let i = 0; i < 600 && !g.attacking; i++) tick(world)
+    for (let i = 0; i < 6; i++) tick(world) // 看到起手才跳
+    tick(world, ['jump'])
+    run(world, 25)
+    expect(world.agent.life.hp).toBe(world.agent.life.max)
+  })
+})
+
+describe('pain hop (regression for "they should hop a little to show it hurts")', () => {
+  const hopsDuring = (pose: () => { lift: number }, stepper: () => void, frames: number) => {
+    let maxLift = 0
+    for (let i = 0; i < frames; i++) {
+      stepper()
+      maxLift = Math.max(maxLift, pose().lift)
+    }
+    return maxLift
+  }
+
+  it('a groin-kicked enemy hops while clutching', () => {
+    const { world, g } = arena()
+    doubleKick(world, 4)
+    expect(hopsDuring(() => g.pose(), () => tick(world), 40)).toBeGreaterThan(4)
+  })
+
+  it('a groin-kicked agent hops while clutching', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    world.agent.life.hp = 99999
+    world.enemies = [new Grunt(320, 'thug', { moves: ['groinKick'] })]
+    for (let i = 0; i < 600 && world.agent.pose().lean <= 40; i++) tick(world)
+    expect(hopsDuring(() => world.agent.pose(), () => tick(world), 30)).toBeGreaterThan(4)
   })
 })
