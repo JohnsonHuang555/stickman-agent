@@ -1,3 +1,4 @@
+import { musicFor, type MusicTrack } from './audio/music'
 import type { Sound } from './audio/sfx'
 import type { InputSnapshot } from './game/input/buttons'
 import { TITLE_MENU, drawLeaderboard, drawTitle } from './game/render/screens'
@@ -14,6 +15,8 @@ export interface AppDeps {
   loadNickname: () => string | null
   saveNickname: (name: string) => void
   sound: (s: Sound) => void
+  /** 每幀告訴背景音樂現在該放哪首、是否暫停。 */
+  music?: (track: MusicTrack | null, paused: boolean) => void
   /** 對話框關閉後呼叫，清掉殘留按鍵。 */
   onDialogClosed?: () => void
   now?: () => number
@@ -66,6 +69,27 @@ export class App {
         }
         break
     }
+    this.updateMusic()
+  }
+
+  /** 現在該放的背景音樂：遊玩中依樓層與 Boss 決定，其他畫面安靜。 */
+  get musicTrack(): MusicTrack | null {
+    const screen = this.screen
+    if (screen.kind !== 'playing') return musicFor({ playing: null })
+    const world = screen.world
+    const boss = world.boss
+    return musicFor({
+      playing: {
+        finalFloor: !!world.floor?.final,
+        bossAlive: !!boss && !boss.life.isDead,
+        ended: world.gameOver || world.phase === 'complete',
+      },
+    })
+  }
+
+  private updateMusic(): void {
+    const paused = this.screen.kind === 'playing' && this.screen.world.paused
+    this.deps.music?.(this.musicTrack, paused)
   }
 
   private moveCursor(screen: { cursor: number }, delta: number): void {

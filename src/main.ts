@@ -1,4 +1,5 @@
 import { App } from './app'
+import { MusicPlayer } from './audio/music'
 import { play, unlockAudio } from './audio/sfx'
 import { Keyboard } from './engine/keyboard'
 import { startLoop } from './engine/loop'
@@ -96,6 +97,7 @@ if (import.meta.env.DEV && params.has('scene')) {
   } else {
     // ?floor=2 直接從 2F 開始（開發用）
     const startFloor = import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0
+    const music = new MusicPlayer()
     const app = new App({
       worldOptions: { mode: 'campaign', startFloor },
       leaderboard: createLeaderboard(),
@@ -103,6 +105,7 @@ if (import.meta.env.DEV && params.has('scene')) {
       loadNickname,
       saveNickname,
       sound: play,
+      music: (track, paused) => music.update(track, paused),
       onDialogClosed: () => keyboard.clear(),
     })
     startLoop(
