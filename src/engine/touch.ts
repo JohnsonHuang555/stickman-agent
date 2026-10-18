@@ -62,7 +62,8 @@ export class TouchControls {
   private readonly base: HTMLDivElement
   private readonly knob: HTMLDivElement
 
-  constructor(onFirstTouch?: () => void) {
+  /** onTouch：每次手指按下時呼叫（瀏覽器只允許在使用者觸碰時切換全螢幕）。 */
+  constructor(onTouch?: () => void) {
     document.body.classList.add('touch')
     this.root = document.createElement('div')
     this.root.id = 'touch-ui'
@@ -74,16 +75,12 @@ export class TouchControls {
     this.base = this.root.querySelector('.stick-base')!
     this.knob = this.root.querySelector('.stick-knob')!
 
-    let first = true
     const opts = { passive: false } as const
     this.root.addEventListener(
       'touchstart',
       (e) => {
         e.preventDefault()
-        if (first) {
-          first = false
-          onFirstTouch?.()
-        }
+        onTouch?.()
         for (const t of Array.from(e.changedTouches)) this.touchStart(t)
       },
       opts,

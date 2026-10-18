@@ -6,6 +6,11 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="火柴人特務" />
+    <meta name="theme-color" content="#0b0b10" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>火柴人特務：黑幫大樓</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,6 +56,14 @@
         left: calc(26px + env(safe-area-inset-left)); top: 26px; width: 40px; height: 40px; margin: -20px 0 0 -20px; font-size: 12px;
       }
 
+      /* 橫向但還沒全螢幕：提示點一下（瀏覽器只允許觸碰時切換全螢幕） */
+      #fs-hint { display: none; }
+      body.fs-hint #fs-hint {
+        display: block; position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 6;
+        padding: 6px 12px; border-radius: 14px; background: rgba(0,0,0,.6); color: #f5c518;
+        font: 12px/1.4 system-ui, sans-serif; pointer-events: none; white-space: nowrap;
+      }
+
       /* 直拿手機：請玩家轉成橫向 */
       #rotate { display: none; }
       @media (orientation: portrait) {
@@ -67,6 +80,7 @@
   <body>
     <canvas id="game" width="480" height="270"></canvas>
     <div id="rotate"><div class="icon">📱</div><div>請將手機轉成橫向</div></div>
+    <div id="fs-hint">點一下畫面即可全螢幕</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -50,17 +50,41 @@ function createLeaderboard(): Leaderboard {
   return config ? new FallbackLeaderboard(new FirestoreLeaderboard(config), new LocalLeaderboard()) : new LocalLeaderboard()
 }
 
-/** 手機第一次觸碰：解鎖音效，並嘗試全螢幕、鎖定橫向（iOS Safari 不支援時就算了）。 */
+/** 從主畫面捷徑（加入主畫面）開啟：本來就是全螢幕。 */
+const isStandalone = () =>
+  matchMedia('(display-mode: fullscreen)').matches ||
+  matchMedia('(display-mode: standalone)').matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true
+
+/**
+ * 手機每次觸碰：解鎖音效；還不是全螢幕就嘗試切換並鎖定橫向。
+ * 瀏覽器只允許在使用者觸碰時切換全螢幕，所以轉成橫向後要點一下畫面；iOS Safari 不支援（請用「加入主畫面」）。
+ */
 function enterMobileMode(): void {
   unlockAudio()
+  if (document.fullscreenElement || !document.fullscreenEnabled || isStandalone()) return
   try {
-    void document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).then(() => {
-      const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
-      return orientation.lock?.('landscape')
-    }).catch(() => {})
+    void document.documentElement
+      .requestFullscreen({ navigationUI: 'hide' })
+      .then(() => {
+        const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }
+        return orientation.lock?.('landscape')
+      })
+      .catch(() => {})
   } catch {
     // 不支援全螢幕
   }
+}
+
+/** 橫向、還沒全螢幕、而且這台瀏覽器可以全螢幕時，上方顯示「點一下畫面即可全螢幕」。 */
+function updateFullscreenHint(): void {
+  const show =
+    document.body.classList.contains('touch') &&
+    innerWidth > innerHeight &&
+    document.fullscreenEnabled &&
+    !document.fullscreenElement &&
+    !isStandalone()
+  document.body.classList.toggle('fs-hint', show)
 }
 
 function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
@@ -85,6 +109,8 @@ if (import.meta.env.DEV && params.has('scene')) {
   import('./dev/itemGallery').then(({ drawItemGallery }) => showStatic(drawItemGallery))
 } else if (import.meta.env.DEV && params.has('grabs')) {
   import('./dev/grabStrip').then(({ makeStrip }) => showStatic(makeStrip(params.get('grabs')!)))
+} else if (import.meta.env.DEV && params.has('icon')) {
+  import('./dev/iconPage').then(({ drawIconPage }) => drawIconPage(Number(params.get('icon')) || 512))
 } else if (import.meta.env.DEV && params.has('poses')) {
   import('./dev/poseGallery').then(({ drawPoseGallery }) => showStatic(drawPoseGallery))
 } else {
@@ -93,6 +119,11 @@ if (import.meta.env.DEV && params.has('scene')) {
   // 手機、平板：顯示觸控按鈕；第一次觸碰時解鎖音效、盡量切到全螢幕橫向
   const touch = wantsTouchControls(params) ? new TouchControls(enterMobileMode) : null
   useTouchHints(!!touch)
+  if (touch) {
+    updateFullscreenHint()
+    addEventListener('resize', updateFullscreenHint)
+    document.addEventListener('fullscreenchange', updateFullscreenHint)
+  }
   const poll = () => mergeInput(keyboard.poll(), touch?.poll() ?? null)
 
   if (params.has('training')) {
