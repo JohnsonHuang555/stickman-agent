@@ -30,11 +30,11 @@ export const BODY = {
 export let LINE_WIDTH = 3.4
 
 /**
- * 3 頭身（Q 版）試看：網址加上 ?chibi 就換成大頭、短手短腳的比例。
+ * Q 版（約 4 頭身）試看：網址加上 ?chibi 就換成頭稍大、短手短腳的比例。
  * 身高維持約 48px，受擊框與判定都不變，只有外觀比例不同。
  */
 const CHIBI_BODY: typeof BODY = {
-  headR: 8,
+  headR: 5.3,
   neck: 1.5,
   torso: 13.5,
   upperArm: 7,
