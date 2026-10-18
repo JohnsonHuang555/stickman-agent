@@ -1,7 +1,7 @@
 import { App } from './app'
 import { useTouchHints } from './game/render/screens'
 import { MusicPlayer } from './audio/music'
-import { play, setSfxVolume, unlockAudio } from './audio/sfx'
+import { audioContext, play, setSfxVolume, unlockAudio } from './audio/sfx'
 import { loadSettings, saveSettings, type Settings } from './settings'
 import { Keyboard } from './engine/keyboard'
 import { TouchControls, mergeInput, wantsTouchControls } from './engine/touch'
@@ -158,7 +158,7 @@ if (import.meta.env.DEV && params.has('scene')) {
   } else {
     // ?floor=2 直接從 2F 開始（開發用）
     const startFloor = import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0
-    const music = new MusicPlayer()
+    const music = new MusicPlayer(audioContext)
     const settings = loadSettings()
     const applySettings = (s: Settings) => {
       setSfxVolume(s.sfx)

@@ -55,6 +55,11 @@ export function setSfxVolume(volume: number): void {
   if (master) master.gain.value = volume
 }
 
+/** 共用的 AudioContext（背景音樂也接到這裡調音量）；使用者按過鍵之前是 null。 */
+export function audioContext(): AudioContext | null {
+  return ctx
+}
+
 /** 必須在使用者按鍵的事件裡呼叫一次，瀏覽器才允許播放聲音。 */
 export function unlockAudio(): void {
   try {
