@@ -201,7 +201,7 @@ export class Agent extends Fighter {
       return
     }
 
-    this.crouching = this.buttons.has('down') && !(this.held && categoryOf(this.held) === 'throwable')
+    this.crouching = this.wantsCrouch()
     this.walking = !this.crouching && dir !== 0
     this.vx = this.walking ? dir * WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1) : 0
     if (dir) this.facing = dir
@@ -268,7 +268,13 @@ export class Agent extends Fighter {
       }
       this.act = null
       this.setState('free')
+      // 蹲拳／掃腿收招時還按著 ↓：直接回到蹲姿，不要閃一幀站姿
+      this.crouching = this.wantsCrouch()
     }
+  }
+
+  private wantsCrouch(): boolean {
+    return !this.airborne && this.buttons.has('down') && !(this.held && categoryOf(this.held) === 'throwable')
   }
 
   /**
