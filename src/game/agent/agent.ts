@@ -24,7 +24,7 @@ import type { Enemy } from '../enemies/enemy'
 import type { Grunt } from '../enemies/grunt'
 import { ENEMY_HOLD } from '../enemies/enemyMoves'
 
-const WALK_SPEED = 2.1
+const WALK_SPEED = 1.7
 /** 連按兩下方向鍵（第二下按住）就跑步。 */
 const RUN_SPEED = 3.2
 /** 起跑後幾幀從小跑步加速到全速（速度、步伐、擺手、前傾一起增加）。 */
