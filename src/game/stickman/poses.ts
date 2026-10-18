@@ -1,5 +1,5 @@
 import { Clip, still } from './clip'
-import { BODY, lerpPose, type Limb, type Pose } from './pose'
+import { BODY, type Limb, type Pose } from './pose'
 
 const P = (lean: number, armF: Limb, armB: Limb, legF: Limb, legB: Limb, lift = 0): Pose => ({
   lean,
@@ -82,25 +82,44 @@ function footAt(phase: number): { x: number; lift: number } {
 }
 
 /*
- * 跑步：身體前傾、手臂前後大幅擺動（手肘彎著）、腳步大、後腳往後踢高。
- * 四個關鍵姿勢依跑過的距離循環補間：前腳著地 → 換腳騰空 → 另一腳著地 → 換腳騰空。
+ * 跑步：程序動畫，依跑過的距離算出連續的相位，手腳都是平順的前後擺動。
+ * - 大腿以正弦前後擺；往前擺（騰空收腿）時膝蓋大幅彎起、腳跟往上踢，往後推地時膝蓋接近打直
+ * - 手肘彎約 90°，和對側的腳同步前後擺：往前時手到下巴、往後時手到臀部後方
+ * - 身體前傾，每一步有一點上下起伏
  */
 export const RUN_CYCLE_DISTANCE = 60
-const RUN_KEYS: readonly Pose[] = [
-  // 右腳（前腳）往前伸著地、左腳往後踢高；手和腳反向
-  P(22, [-45, 30], [55, 140], [55, 15], [-40, -105]),
-  // 換腳騰空：前腳收到身體下方、後腳膝蓋往前抬
-  P(24, [5, 95], [15, 100], [-5, -45], [70, -10]),
-  // 左腳往前著地、右腳往後踢高
-  P(22, [55, 140], [-45, 30], [-40, -105], [55, 15]),
-  P(24, [15, 100], [5, 95], [70, -10], [-5, -45]),
-]
+const RUN_LEAN = 18
+/** 大腿前後擺動：中心角度與幅度。 */
+const RUN_THIGH_CENTER = 10
+const RUN_THIGH_SWING = 42
+/** 膝蓋彎曲：推地時最小、大腿往前擺時最大（膝蓋往前頂、小腿垂著），落地前才伸直。 */
+const RUN_KNEE_MIN = 12
+const RUN_KNEE_MAX = 110
+const RUN_KNEE_PEAK_SHIFT = -0.6
+/** 手臂前後擺動與手肘彎曲。 */
+const RUN_ARM_CENTER = 10
+const RUN_ARM_SWING = 55
+const RUN_ELBOW = 85
+
+function runLeg(phase: number): Limb {
+  const a = phase * Math.PI * 2
+  const thigh = RUN_THIGH_CENTER + RUN_THIGH_SWING * Math.sin(a)
+  const bend = RUN_KNEE_MIN + (RUN_KNEE_MAX - RUN_KNEE_MIN) * Math.max(0, Math.cos(a + RUN_KNEE_PEAK_SHIFT))
+  return [thigh, thigh - bend]
+}
+
+function runArm(phase: number): Limb {
+  const upper = RUN_ARM_CENTER + RUN_ARM_SWING * Math.sin(phase * Math.PI * 2)
+  return [upper, upper + RUN_ELBOW]
+}
 
 /** 跑過 stride px 時的跑步姿勢。 */
 export function runPose(stride: number): Pose {
-  const t = ((((stride / RUN_CYCLE_DISTANCE) % 1) + 1) % 1) * RUN_KEYS.length
-  const i = Math.floor(t)
-  return lerpPose(RUN_KEYS[i], RUN_KEYS[(i + 1) % RUN_KEYS.length], t - i)
+  const phase = (((stride / RUN_CYCLE_DISTANCE) % 1) + 1) % 1
+  const other = (phase + 0.5) % 1
+  // 手和對側的腳同步：前腳往前時前手往後
+  const bounce = 1.5 * Math.abs(Math.sin(phase * Math.PI * 2))
+  return P(RUN_LEAN, runArm(other), runArm(phase), runLeg(phase), runLeg(other), bounce)
 }
 
 /** 走過 stride px 時的走路姿勢。 */

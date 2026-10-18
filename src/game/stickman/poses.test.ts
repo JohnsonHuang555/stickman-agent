@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { posePoints, type Pose } from './pose'
-import { ATTACK_POSES, HOLD_ARMS, POSES, WALK_CYCLE_DISTANCE, walkPose } from './poses'
+import { ATTACK_POSES, HOLD_ARMS, POSES, RUN_CYCLE_DISTANCE, WALK_CYCLE_DISTANCE, runPose, walkPose } from './poses'
 
 /** 角度差正規化到 (-180, 180]。 */
 const diff = (a: number, b: number) => ((((a - b) % 360) + 540) % 360) - 180
@@ -111,5 +111,38 @@ describe('walk leg lift (regression for "legs lift too high")', () => {
 describe('air kicks look like the title screen (regression for "the flying kick should look like the cover")', () => {
   it('the air kick and the flying kick share the cover pose', () => {
     expect(ATTACK_POSES.airKick).toBe(ATTACK_POSES.flyingKick)
+  })
+})
+
+describe('run cycle (regression for "the running animation looks odd")', () => {
+  const frames = Array.from({ length: 60 }, (_, i) => runPose((RUN_CYCLE_DISTANCE * i) / 60))
+
+  it('knees and elbows only bend the natural way throughout the cycle', () => {
+    for (const p of frames) {
+      for (const [thigh, shin] of [p.legF, p.legB]) expect(diff(thigh, shin)).toBeGreaterThanOrEqual(-TOLERANCE)
+      for (const [upper, fore] of [p.armF, p.armB]) expect(diff(fore, upper)).toBeGreaterThanOrEqual(-TOLERANCE)
+    }
+  })
+
+  it('each arm swings opposite to the leg on the same side', () => {
+    for (const p of frames) {
+      // 前腳往前（大腿角度大）時前手往後（上臂角度小）
+      if (p.legF[0] > p.legB[0] + 20) expect(p.armF[0]).toBeLessThan(p.armB[0])
+      if (p.legB[0] > p.legF[0] + 20) expect(p.armB[0]).toBeLessThan(p.armF[0])
+    }
+  })
+
+  it('when the thigh is at its most forward the knee is bent (knee drive), not a straight lunge', () => {
+    const forward = frames.reduce((a, b) => (b.legF[0] > a.legF[0] ? b : a))
+    expect(diff(forward.legF[0], forward.legF[1])).toBeGreaterThan(40)
+  })
+
+  it('motion is continuous: no joint jumps more than 15° between neighbouring frames (60 per cycle)', () => {
+    const joints = (p: Pose) => [...p.armF, ...p.armB, ...p.legF, ...p.legB]
+    for (let i = 0; i < frames.length; i++) {
+      const a = joints(frames[i])
+      const b = joints(frames[(i + 1) % frames.length])
+      for (let j = 0; j < a.length; j++) expect(Math.abs(diff(a[j], b[j]))).toBeLessThan(15)
+    }
   })
 })

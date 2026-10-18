@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MOVES } from './agent/moves'
 import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
+import { walkPose } from './stickman/poses'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -71,7 +72,8 @@ describe('running (double-tap and hold a direction)', () => {
     const world = sandbox()
     doubleTap(world)
     run(world, 10, ['right'])
-    expect(world.agent.pose().lean).toBeGreaterThan(18)
+    // 比走路明顯往前傾
+    expect(world.agent.pose().lean).toBeGreaterThan(walkPose(0).lean + 8)
   })
 
   it('jumping while running carries the run speed into the jump', () => {
