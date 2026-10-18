@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { App, type AppDeps } from './app'
 import type { Button } from './game/input/buttons'
-import { TITLE_MENU } from './game/render/screens'
+import { SETTINGS_MENU, TITLE_MENU } from './game/render/screens'
 import { CLEARED_FLOOR, LocalLeaderboard } from './leaderboard/leaderboard'
 
 function memoryStore() {
@@ -116,16 +116,19 @@ describe('App flow', () => {
     expect((await leaderboard.top(1))[0].floor).toBe(CLEARED_FLOOR)
   })
 
-  it('NICKNAME on the title opens the dialog with the current name', async () => {
+  it('NICKNAME lives in SETTINGS: it opens the dialog with the current name and returns to settings', async () => {
     const ask = vi.fn(async () => 'NEW')
     const { app, deps } = makeApp({ loadNickname: () => 'OLD', askNickname: ask })
-    press(app, 'up')
+    expect(TITLE_MENU).not.toContain('NICKNAME')
+    for (let i = 0; i < TITLE_MENU.indexOf('SETTINGS'); i++) press(app, 'down')
+    press(app, 'confirm')
+    for (let i = 0; i < SETTINGS_MENU.indexOf('NICKNAME'); i++) press(app, 'down')
     press(app, 'confirm')
     expect(ask).toHaveBeenCalledWith({ initial: 'OLD', firstTime: false })
     await settle()
     expect(app.nickname).toBe('NEW')
     expect(deps.saveNickname).toHaveBeenCalledWith('NEW')
-    expect(app.screen).toEqual({ kind: 'title', cursor: TITLE_MENU.length - 1 })
+    expect(app.screen).toEqual({ kind: 'settings', cursor: SETTINGS_MENU.indexOf('NICKNAME') })
   })
 
   it('LEADERBOARD on the title shows the board without a highlight', async () => {

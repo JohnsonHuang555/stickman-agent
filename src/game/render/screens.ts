@@ -14,12 +14,12 @@ export function useTouchHints(on: boolean): void {
 }
 export const usingTouchHints = () => touchHints
 
-export const TITLE_MENU = ['START', 'SURVIVAL', 'PRACTICE', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
-/** 從標題進入的設定畫面：DONE 顯示為 BACK。 */
-export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
+export const TITLE_MENU = ['START', 'SURVIVAL', 'PRACTICE', 'LEADERBOARD', 'SETTINGS'] as const
+/** 從標題進入的設定畫面：可以改暱稱，DONE 顯示為 BACK。 */
+export const SETTINGS_MENU = ['MUSIC', 'SFX', 'NICKNAME', 'DONE'] as const
 /** 遊戲中暫停的面板：DONE 顯示為 RESUME，多一個回到主畫面。 */
 export const PAUSE_MENU = ['MUSIC', 'SFX', 'DONE', 'QUIT'] as const
-export type SettingsItem = (typeof PAUSE_MENU)[number]
+export type SettingsItem = (typeof SETTINGS_MENU)[number] | (typeof PAUSE_MENU)[number]
 
 // 標題畫面的魔王只是裝飾
 const titleBoss = new Boss(400, 'johnson')
@@ -37,7 +37,6 @@ const TITLE_LABELS: Record<(typeof TITLE_MENU)[number], string> = {
   PRACTICE: '練習模式',
   LEADERBOARD: '排行榜',
   SETTINGS: '設定',
-  NICKNAME: '暱稱',
 }
 
 const CJK_FONT = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", "Heiti TC", sans-serif'
@@ -54,7 +53,7 @@ function cjkText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number,
   ctx.fillText(s, x, y)
 }
 
-export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nickname: string | null, frame: number): void {
+export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, frame: number): void {
   drawBackground(ctx, 'office', frame * 0.3, null, frame)
   dim(ctx, 0.45)
 
@@ -66,9 +65,8 @@ export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nicknam
   cjkText(ctx, '黑幫大樓', VIEW_W / 2, 74, 16, '#f5c518')
 
   TITLE_MENU.forEach((item, i) => {
-    const y = 122 + i * 18
-    const label = item === 'NICKNAME' ? `暱稱：${nickname ?? '---'}` : TITLE_LABELS[item]
-    cjkText(ctx, label, VIEW_W / 2, y, 11, '#ffffff')
+    const y = 124 + i * 20
+    cjkText(ctx, TITLE_LABELS[item], VIEW_W / 2, y, 11, '#ffffff')
     if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', VIEW_W / 2 - 70, y + 2, 8, 'left')
   })
 
@@ -143,6 +141,8 @@ export function drawSettings(
   overlay: boolean,
   /** 已經按過一次 QUIT，等第二次確認。 */
   quitArmed = false,
+  /** 標題的設定畫面顯示目前的暱稱（暫停面板沒有這一項）。 */
+  nickname: string | null = null,
 ): void {
   if (overlay) dim(ctx, 0.8)
   else {
@@ -151,18 +151,22 @@ export function drawSettings(
   }
   text(ctx, overlay ? 'PAUSE' : 'SETTINGS', VIEW_W / 2, 10, 12, 'center')
 
-  const rows: [string, number | null][] = [
+  const rows: [string, number | string | null][] = [
     ['MUSIC', settings.music],
     ['SFX', settings.sfx],
-    [overlay ? 'RESUME' : 'BACK', null],
   ]
+  if (!overlay) rows.push(['NAME', nickname ?? '---'])
+  rows.push([overlay ? 'RESUME' : 'BACK', null])
   if (overlay) rows.push([quitArmed ? 'QUIT TO TITLE?  PRESS J AGAIN' : 'QUIT TO TITLE', null])
-  const rowGap = overlay ? 14 : 16
   rows.forEach(([label, value], i) => {
-    const y = 32 + i * rowGap
+    const y = 32 + i * 14
     if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', 128, y, 8)
     text(ctx, label, 144, y, 8)
     if (value === null) return
+    if (typeof value === 'string') {
+      text(ctx, value, 208, y, 8)
+      return
+    }
     // 音量條：20 格，每格 5%
     const cells = 20
     const filled = Math.round(value * cells)
@@ -177,7 +181,7 @@ export function drawSettings(
   const cols = [14, 170, 326]
   CONTROL_GROUPS.forEach((group, g) => {
     const x = cols[g]
-    let y = overlay ? 98 : 92
+    let y = 98
     ctx.fillStyle = '#f5c518'
     ctx.font = 'bold 8px monospace'
     ctx.textAlign = 'left'

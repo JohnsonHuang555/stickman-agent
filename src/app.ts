@@ -107,7 +107,10 @@ export class App {
           back()
           break
         }
-        screen.cursor = this.settingsInput(pressed, screen.cursor, SETTINGS_MENU, back)
+        screen.cursor = this.settingsInput(pressed, screen.cursor, SETTINGS_MENU, (item) => {
+          if (item === 'NICKNAME') void this.changeNickname()
+          else back()
+        })
         break
       }
       case 'dialog':
@@ -147,13 +150,13 @@ export class App {
   }
 
   /**
-   * 設定面板的操作：↑↓ 選項、←→ 調音量、在 DONE／QUIT 按 Z／ENTER 執行 choose。回傳新的游標。
+   * 設定面板的操作：↑↓ 選項、←→ 調音量、在 NICKNAME／DONE／QUIT 按 J／ENTER 執行 choose。回傳新的游標。
    */
   private settingsInput(
     pressed: (...buttons: string[]) => boolean,
     cursor: number,
     items: readonly SettingsItem[],
-    choose: (item: 'DONE' | 'QUIT') => void,
+    choose: (item: 'NICKNAME' | 'DONE' | 'QUIT') => void,
   ): number {
     const n = items.length
     if (pressed('up')) {
@@ -172,7 +175,7 @@ export class App {
       // 調音效時放一聲讓玩家聽聽看大小
       this.deps.sound(item === 'SFX' ? 'hit' : 'menu')
     }
-    if ((item === 'DONE' || item === 'QUIT') && pressed('punch', 'confirm', 'jump')) {
+    if ((item === 'NICKNAME' || item === 'DONE' || item === 'QUIT') && pressed('punch', 'confirm', 'jump')) {
       this.deps.sound('select')
       choose(item)
     }
@@ -200,10 +203,8 @@ export class App {
       this.screen = { kind: 'playing', world: this.newWorld({ mode: 'training' }), tutorial: new Tutorial() }
     } else if (item === 'LEADERBOARD') {
       void this.showLeaderboard(null)
-    } else if (item === 'SETTINGS') {
-      this.screen = { kind: 'settings', cursor: 0 }
     } else {
-      void this.changeNickname()
+      this.screen = { kind: 'settings', cursor: 0 }
     }
   }
 
@@ -219,7 +220,7 @@ export class App {
     const name = await this.deps.askNickname({ initial: this.nickname, firstTime: false })
     if (name) this.setNickname(name)
     this.deps.onDialogClosed?.()
-    this.screen = { kind: 'title', cursor: TITLE_MENU.indexOf('NICKNAME') }
+    this.screen = { kind: 'settings', cursor: SETTINGS_MENU.indexOf('NICKNAME') }
   }
 
   /** 一局結束：還沒有暱稱就先問一次（可略過），然後上傳成績並顯示排行榜。 */
@@ -273,7 +274,7 @@ export class App {
     const screen = this.screen
     switch (screen.kind) {
       case 'title':
-        drawTitle(ctx, screen.cursor, this.nickname, this.frame)
+        drawTitle(ctx, screen.cursor, this.frame)
         break
       case 'playing':
         screen.world.render(ctx)
@@ -281,11 +282,11 @@ export class App {
         if (screen.world.paused) drawSettings(ctx, this.settings, this.pauseCursor, this.frame, true, this.quitArmed)
         break
       case 'settings':
-        drawSettings(ctx, this.settings, screen.cursor, this.frame, false)
+        drawSettings(ctx, this.settings, screen.cursor, this.frame, false, false, this.nickname)
         break
       case 'dialog':
         if (screen.background) screen.background.render(ctx)
-        else drawTitle(ctx, TITLE_MENU.indexOf('NICKNAME'), this.nickname, this.frame)
+        else drawSettings(ctx, this.settings, SETTINGS_MENU.indexOf('NICKNAME'), this.frame, false, false, this.nickname)
         break
       case 'leaderboard':
         drawLeaderboard(ctx, screen.entries, screen.highlight, this.frame, screen.board)
