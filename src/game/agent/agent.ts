@@ -6,8 +6,8 @@ import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, 
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
-import { CROUCH_HEIGHT, STAND_HEIGHT, type Pose } from '../stickman/pose'
-import { CLIPS, walkPose } from '../stickman/poses'
+import { CROUCH_HEIGHT, STAND_HEIGHT, lerpPose, type Pose } from '../stickman/pose'
+import { CLIPS, POSES, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { MOVES, type MoveId } from './moves'
 
@@ -30,6 +30,12 @@ const WALL_JUMP_VELOCITY = 6.2
 const COMMAND_BUFFER = 10
 const JUMP_BUFFER = 8
 const LAND_FRAMES = 4
+/** 換姿勢時的補間幀數。 */
+const POSE_BLEND = 6
+/** 換到這些姿勢不補間：出招、被打要立刻看得出來。 */
+const SNAP_POSES = new Set(['action', 'hurt', 'launched', 'down'])
+/** 垂直速度在 ±這個值之間時，從上升姿勢轉成下落姿勢（約 11 幀）。 */
+const APEX_BLEND_SPEED = 2
 const DOWN_FRAMES = 40
 const GETUP_FRAMES = 18
 const PICKUP_FRAMES = 10
@@ -66,6 +72,11 @@ export class Agent extends Fighter {
   private state: AgentState = 'free'
   private stateFrame = 0
   private animFrame = 0
+  /** 換姿勢補間：從哪個姿勢、哪一幀開始。 */
+  private blendFrom: Pose | null = null
+  private blendAt = 0
+  private poseKeyNow = 'idle'
+  private shownPose: Pose = POSES.idleA
   private act: ActionInstance | null = null
   private buttons: ReadonlySet<Button> = new Set()
   private buffered: { cmd: Command; until: number } | null = null
@@ -155,6 +166,7 @@ export class Agent extends Fighter {
     if (this.applyPhysics(world)) this.onLand()
     // 只有翻滾時身體會旋轉；被打斷或做別的動作時立刻轉正
     if (this.state !== 'action' || this.act?.def !== MOVES.roll) this.rotation = 0
+    this.trackPoseBlend()
   }
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
@@ -461,7 +473,35 @@ export class Agent extends Fighter {
     }
   }
 
+  /**
+   * 實際畫出來的姿勢：起跳、落地、走停、蹲站這類換姿勢時，
+   * 從上一幀畫面的姿勢補間 POSE_BLEND 幀過去，不會一瞬間跳格。
+   */
   pose(): Pose {
+    const target = this.targetPose()
+    const k = this.animFrame - this.blendAt
+    if (!this.blendFrom || k >= POSE_BLEND) return target
+    const t = (k + 1) / (POSE_BLEND + 1)
+    return lerpPose(this.blendFrom, target, 1 - (1 - t) * (1 - t))
+  }
+
+  /** 每幀更新完呼叫：姿勢的來源換了就從目前畫面開始補間（出招、被打不補間，要立刻反應）。 */
+  private trackPoseBlend(): void {
+    const key = this.poseKey()
+    if (key !== this.poseKeyNow) {
+      this.blendFrom = SNAP_POSES.has(key) ? null : this.shownPose
+      this.blendAt = this.animFrame
+      this.poseKeyNow = key
+    }
+    this.shownPose = this.pose()
+  }
+
+  private poseKey(): string {
+    if (this.state !== 'free') return this.state
+    return this.airborne ? 'air' : this.crouching ? 'crouch' : this.walking ? 'walk' : 'idle'
+  }
+
+  private targetPose(): Pose {
     switch (this.state) {
       case 'action':
         return this.act!.def.clip.sample(this.act!.frame)
@@ -478,7 +518,11 @@ export class Agent extends Fighter {
       case 'getup':
         return CLIPS.getup.sample(0)
       case 'free':
-        if (this.airborne) return this.withHoldArms((this.vh > 0 ? CLIPS.jumpUp : CLIPS.jumpFall).sample(0))
+        if (this.airborne) {
+          // 接近最高點時，依垂直速度從上升姿勢慢慢轉成下落姿勢
+          const t = Math.min(1, Math.max(0, (APEX_BLEND_SPEED - this.vh) / (2 * APEX_BLEND_SPEED)))
+          return this.withHoldArms(lerpPose(POSES.jumpUp, POSES.jumpFall, t * t * (3 - 2 * t)))
+        }
         if (this.crouching) return CLIPS.crouch.sample(0)
         if (this.walking) return this.withHoldArms(walkPose(this.stride))
         return this.withHoldArms(CLIPS.idle.sample(this.animFrame))
