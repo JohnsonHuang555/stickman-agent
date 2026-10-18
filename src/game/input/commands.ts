@@ -31,9 +31,9 @@ export const DOUBLE_TAP_WINDOW = 14
 /** 快速連按兩下 X（間隔不超過這麼多幀）就踢下體。 */
 export const DOUBLE_KICK_WINDOW = 10
 /** 挑空技：按 ↑ 之前這麼多幀內按過 ↓，才算「↓ 再 ↑」。 */
-export const LAUNCH_INPUT_WINDOW = 10
+export const LAUNCH_INPUT_WINDOW = 16
 /** 「↓ 再 ↑」之後等這麼多幀看有沒有接拳；沒接拳才起跳。 */
-export const LAUNCH_WAIT = 6
+export const LAUNCH_WAIT = 12
 
 export interface CommandContext {
   frame: number
@@ -77,6 +77,8 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   if (DESPERATION_BUTTONS.every((b) => recently(b) && stillHeld(b))) return { kind: 'desperation' }
 
   if (!punch && !kick) return null
+  // 剛輸入 S → W 就按拳：挑空技優先（手快的人按 J 時 S 常常還沒放開，不能被當成蹲拳）
+  if (punch && ctx.launchReady) return { kind: 'launcher' }
   // 蹲著：Z 蹲拳（腿不動）、X 掃腿（不會站起來）
   if (ctx.crouching) return { kind: kick ? 'sweep' : 'crouchPunch' }
   if (ctx.running) return kick ? { kind: 'runKick', dir: ctx.running } : { kind: 'dashPunch', dir: ctx.running }
@@ -84,7 +86,6 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
     const kickedJustNow = ctx.presses.some((p) => p.button === 'kick' && p.frame < ctx.frame && ctx.frame - p.frame <= DOUBLE_KICK_WINDOW)
     return { kind: kickedJustNow ? 'groinKick' : 'kick' }
   }
-  if (ctx.launchReady) return { kind: 'launcher' }
 
   const dir = doubleTapDirection(ctx.presses, ctx.frame)
   if (dir) return { kind: 'dashPunch', dir }

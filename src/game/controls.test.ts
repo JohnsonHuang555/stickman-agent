@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { KEYMAP, type Button } from './input/buttons'
 import { LAUNCH_WAIT } from './input/commands'
+import { Grunt } from './enemies/grunt'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -73,5 +74,42 @@ describe('jumping with W (up)', () => {
     tick(world, ['up'])
     tick(world, ['punch'])
     expect(framesUntilAirborne(world, 20)).toBe(-1)
+  })
+})
+
+describe('launcher input is forgiving (regression for "the launcher is too hard to pull off")', () => {
+  /** S，等 g1 幀按 W，再等 g2 幀按 J；holdDown = 按 J 時 S 還沒放開。回傳雜兵有沒有被打上空中。 */
+  function tryLaunch(g1: number, g2: number, holdDown: boolean): boolean {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    const g = new Grunt(320, 'thug', { passive: true })
+    g.life.hp = 999
+    world.enemies = [g]
+    for (let i = 0; i < 5; i++) tick(world)
+    const down = (f: number): Button[] => ((holdDown ? f < g1 + g2 + 2 : f < 3) ? ['down'] : [])
+    let f = 0
+    tick(world, ['down'])
+    f++
+    for (let i = 1; i < g1; i++, f++) tick(world, [], down(f))
+    tick(world, ['up'], down(f))
+    f++
+    for (let i = 1; i < g2; i++, f++) tick(world, [], down(f))
+    tick(world, ['punch'], down(f))
+    for (let i = 0; i < 30; i++) {
+      tick(world)
+      if (g.juggled) return true
+    }
+    return false
+  }
+
+  it.each([
+    [4, 4],
+    [8, 8],
+    [14, 6],
+    [6, 12],
+  ])('S →(%i frames)→ W →(%i frames)→ J launches, whether or not S is still held', (g1, g2) => {
+    expect(tryLaunch(g1, g2, false)).toBe(true)
+    expect(tryLaunch(g1, g2, true)).toBe(true)
   })
 })
