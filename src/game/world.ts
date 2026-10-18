@@ -3,7 +3,7 @@ import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
 import { ComboCounter } from './combat/comboCounter'
 import { overlaps, type HitSpec, type Hitter } from './combat/types'
-import { GROUND_Y, WORLD_VIEW_W, WORLD_ZOOM } from './constants'
+import { BACKGROUND_SCALE, GROUND_Y, WORLD_VIEW_W, WORLD_ZOOM } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
 import { Boss } from './enemies/boss'
 import { Enemy } from './enemies/enemy'
@@ -752,7 +752,10 @@ export class World {
     ctx.scale(WORLD_ZOOM, WORLD_ZOOM)
     ctx.translate(0, -GROUND_Y)
     this.fx.applyZoom(ctx, camX, this.realFrame)
-    drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame)
+    drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame, {
+      scale: BACKGROUND_SCALE,
+      width: WORLD_VIEW_W,
+    })
     for (const c of this.crates) c.draw(ctx, camX)
     for (const i of this.items) if (i.state === 'ground') i.draw(ctx, camX)
     this.drawPickupPrompt(ctx, camX)

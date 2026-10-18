@@ -1,4 +1,9 @@
 import { GROUND_Y, VIEW_H, VIEW_W } from '../constants'
+
+/** 這次要畫的寬度（背景座標）；縮小背景時要畫得更寬才鋪滿畫面。 */
+let W = VIEW_W
+/** 這次背景的縮放（樓層物件的世界座標要換算成背景座標）。 */
+let S = 1
 import type { Theme } from '../level/floors'
 
 /**
@@ -80,7 +85,7 @@ const hash = (n: number) => {
 function repeat(camX: number, step: number, parallax: number, draw: (x: number, index: number) => void): void {
   const offset = camX * parallax
   const first = Math.floor((offset - step) / step)
-  const last = Math.ceil((offset + VIEW_W + step) / step)
+  const last = Math.ceil((offset + W + step) / step)
   for (let i = first; i <= last; i++) draw(i * step - offset, i)
 }
 
@@ -139,18 +144,18 @@ function pillars(ctx: CanvasRenderingContext2D, p: Palette, camX: number, step: 
 
 function floor(ctx: CanvasRenderingContext2D, p: Palette): void {
   ctx.fillStyle = vGradient(ctx, GROUND_Y, VIEW_H, p.floorTop, p.floorBottom)
-  ctx.fillRect(0, GROUND_Y, VIEW_W, VIEW_H - GROUND_Y)
+  ctx.fillRect(0, GROUND_Y, W, VIEW_H - GROUND_Y)
   ctx.fillStyle = p.floorLine
-  ctx.fillRect(0, GROUND_Y, VIEW_W, 1.5)
+  ctx.fillRect(0, GROUND_Y, W, 1.5)
   ctx.fillStyle = 'rgba(255,255,255,0.25)'
-  ctx.fillRect(0, GROUND_Y + 1.5, VIEW_W, 3)
+  ctx.fillRect(0, GROUND_Y + 1.5, W, 3)
 }
 
 function wall(ctx: CanvasRenderingContext2D, p: Palette): void {
   ctx.fillStyle = vGradient(ctx, CEILING, GROUND_Y, p.wallTop, p.wallBottom)
-  ctx.fillRect(0, 0, VIEW_W, GROUND_Y)
+  ctx.fillRect(0, 0, W, GROUND_Y)
   ctx.fillStyle = p.ceiling
-  ctx.fillRect(0, 0, VIEW_W, CEILING)
+  ctx.fillRect(0, 0, W, CEILING)
 }
 
 /** 1F：一排高窗與柱子。 */
@@ -198,14 +203,14 @@ function casino(ctx: CanvasRenderingContext2D, p: Palette, camX: number, t: numb
 function office(ctx: CanvasRenderingContext2D, p: Palette, camX: number): void {
   wall(ctx, p)
   const windowH = 140
-  view(ctx, p, 'office', 0, CEILING, VIEW_W, windowH, camX)
+  view(ctx, p, 'office', 0, CEILING, W, windowH, camX)
   ctx.fillStyle = p.frame
   repeat(camX, 160, 1, (x) => ctx.fillRect(x, CEILING, 5, windowH))
-  ctx.fillRect(0, CEILING + windowH, VIEW_W, 4)
+  ctx.fillRect(0, CEILING + windowH, W, 4)
 
   // 魔王的大辦公桌：單色剪影
-  const desk = 1300 - camX
-  if (desk > -100 && desk < VIEW_W + 100) {
+  const desk = 1300 / S - camX
+  if (desk > -100 && desk < W + 100) {
     ctx.fillStyle = '#8e9aba'
     ctx.fillRect(desk - 16, GROUND_Y - 56, 32, 28)
     ctx.fillStyle = '#7a87a8'
@@ -219,7 +224,7 @@ function office(ctx: CanvasRenderingContext2D, p: Palette, camX: number): void {
 /** 樓層終點往上的樓梯與 UP 標示。 */
 function stairs(ctx: CanvasRenderingContext2D, p: Palette, camX: number, stairsX: number, t: number): void {
   const x = stairsX - camX - 30
-  if (x > VIEW_W || x < -100) return
+  if (x > W || x < -100) return
   ctx.fillStyle = p.pillarShade
   ctx.fillRect(x - 4, 36, 78, GROUND_Y - 36)
   for (let i = 0; i < 8; i++) {
@@ -236,18 +241,42 @@ function stairs(ctx: CanvasRenderingContext2D, p: Palette, camX: number, stairsX
   ctx.fillText('UP', x + 35, 54)
 }
 
+/**
+ * 畫背景。遊戲中用 scale 把建築（窗戶、柱子、天花板）以地面為基準縮小，人物相對變大
+ * （頭碰得到窗戶），判定與手感都不變；width 是要鋪滿的世界寬度。
+ * 縮小後背景蓋不到的上方鋪天花板色、下方鋪地板色；捲動仍和地面 1:1，人物不會像在滑。
+ */
 export function drawBackground(
   ctx: CanvasRenderingContext2D,
   theme: Theme,
   camX: number,
   stairsX: number | null,
   t = 0,
+  opts: { scale?: number; width?: number } = {},
 ): void {
   const p = PALETTES[theme]
-  if (theme === 'casino') casino(ctx, p, camX, t)
-  else if (theme === 'office') office(ctx, p, camX)
-  else lobby(ctx, p, camX)
-  if (stairsX !== null) stairs(ctx, p, camX, stairsX, t)
+  const scale = opts.scale ?? 1
+  const width = opts.width ?? VIEW_W
+  if (scale !== 1) {
+    ctx.fillStyle = p.ceiling
+    ctx.fillRect(0, -GROUND_Y, width, GROUND_Y * 2)
+    ctx.fillStyle = p.floorBottom
+    ctx.fillRect(0, GROUND_Y, width, VIEW_H)
+    ctx.save()
+    ctx.translate(0, GROUND_Y)
+    ctx.scale(scale, scale)
+    ctx.translate(0, -GROUND_Y)
+  }
+  W = width / scale
+  S = scale
+  const bgCamX = camX / scale
+  if (theme === 'casino') casino(ctx, p, bgCamX, t)
+  else if (theme === 'office') office(ctx, p, bgCamX)
+  else lobby(ctx, p, bgCamX)
+  if (stairsX !== null) stairs(ctx, p, bgCamX, stairsX / scale, t)
+  if (scale !== 1) ctx.restore()
+  W = VIEW_W
+  S = 1
 }
 
 export function drawLobby(ctx: CanvasRenderingContext2D, camX: number): void {

@@ -116,7 +116,10 @@ describe('finishing blow slow motion', () => {
       tick(world)
     }
     expect(world.director!.finalWaveOut).toBe(true)
-    run(world, 120) // 等最後一波都走進來
+    // 等最後一波都走進來；這段時間特務無敵（敵人不會打無敵的特務），之後才不會正好倒在地上出不了拳
+    world.agent.invuln = 999
+    run(world, 120)
+    world.agent.invuln = 0
     const g = new Grunt(world.agent.x + 14, 'thug', { passive: true })
     g.entered = true
     g.life.hp = 1
