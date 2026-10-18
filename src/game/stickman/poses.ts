@@ -82,56 +82,95 @@ function footAt(phase: number): { x: number; lift: number } {
 }
 
 /*
- * 跑步（參考跑步圖示的姿勢）：程序動畫，依跑過的距離算出連續的相位。
- * - 每一步的最遠點是「剪刀腳」：前腳大腿往前上抬、膝蓋彎、小腿稍往後斜；
- *   後腳往後伸、膝蓋彎、腳在身後低處
- * - 兩腳在身體下方交會時：往前收的腳腳跟往上踢到臀部，推地的腳接近打直
- * - 手肘彎約 90°、和對側的腳同步：往前時前臂往前上舉，往後時上臂往後接近水平、前臂垂下
- * - 身體前傾，騰空時微微抬高
+ * 跑步（參考跑步圖示的姿勢）：程序動畫，相位由特務依跑過的距離累積。
+ * - 每一步的最遠點是「剪刀腳」：前腳大腿往前上抬、膝蓋彎、小腿稍往後斜；後腳低低地伸在身後
+ * - 兩腳在身體下方交會時：往前收的腳腳跟往上踢，推地的腳接近打直
+ * - 手肘彎著、和對側的腳同步：往前時前臂往前上舉，往後時上臂往後、前臂垂下
+ * - intensity 0 → 1：剛起跑是上身較直、步伐小的小跑步，加速到全速時步伐和擺手最大、身體最前傾
  */
-export const RUN_CYCLE_DISTANCE = 54
-const RUN_LEAN = 20
-/** 大腿：往前最遠 55°、往後最遠 -38°。 */
-const RUN_THIGH_FRONT = 55
-const RUN_THIGH_BACK = -38
-/** 膝蓋彎曲：腳在最前 70°、最後 22°（後腳低低地伸在身後）、往前收腿交會時 115°（腳跟踢到臀部）、推地交會時 15°。 */
-const RUN_KNEE_FRONT = 70
-const RUN_KNEE_BACK = 22
-const RUN_KNEE_RECOVER = 115
-const RUN_KNEE_STANCE = 15
-/** 手：往前時上臂 45°、前臂 120°（往前上舉）；往後時上臂 -90°（往後接近水平）、前臂 -10°（垂下）。 */
-const RUN_ARM_FORWARD: Limb = [45, 120]
-const RUN_ARM_BACK: Limb = [-90, -10]
+/** 全速時一個循環（兩步）前進的距離；約 0.6 秒跑一個循環，手腳不會擺得太快。 */
+export const RUN_CYCLE_DISTANCE = 110
+/** 剛起跑（小跑步）時一個循環的距離。 */
+export const JOG_CYCLE_DISTANCE = 64
 
-function runLeg(phase: number): Limb {
+interface RunShape {
+  lean: number
+  thighFront: number
+  thighBack: number
+  kneeFront: number
+  kneeBack: number
+  /** 往前收腿、兩腳交會時的膝蓋彎曲（腳跟往上踢）。 */
+  kneeRecover: number
+  kneeStance: number
+  armForward: Limb
+  armBack: Limb
+}
+
+const JOG: RunShape = {
+  lean: 10,
+  thighFront: 28,
+  thighBack: -12,
+  kneeFront: 45,
+  kneeBack: 18,
+  kneeRecover: 85,
+  kneeStance: 12,
+  armForward: [25, 115],
+  armBack: [-35, 45],
+}
+
+const SPRINT: RunShape = {
+  lean: 20,
+  thighFront: 55,
+  thighBack: -38,
+  kneeFront: 70,
+  kneeBack: 22,
+  kneeRecover: 115,
+  kneeStance: 15,
+  armForward: [45, 120],
+  armBack: [-90, -10],
+}
+
+const mix = (a: number, b: number, t: number) => a + (b - a) * t
+const mixLimb = (a: Limb, b: Limb, t: number): Limb => [mix(a[0], b[0], t), mix(a[1], b[1], t)]
+
+function runShape(intensity: number): RunShape {
+  const t = Math.min(1, Math.max(0, intensity))
+  return {
+    lean: mix(JOG.lean, SPRINT.lean, t),
+    thighFront: mix(JOG.thighFront, SPRINT.thighFront, t),
+    thighBack: mix(JOG.thighBack, SPRINT.thighBack, t),
+    kneeFront: mix(JOG.kneeFront, SPRINT.kneeFront, t),
+    kneeBack: mix(JOG.kneeBack, SPRINT.kneeBack, t),
+    kneeRecover: mix(JOG.kneeRecover, SPRINT.kneeRecover, t),
+    kneeStance: mix(JOG.kneeStance, SPRINT.kneeStance, t),
+    armForward: mixLimb(JOG.armForward, SPRINT.armForward, t),
+    armBack: mixLimb(JOG.armBack, SPRINT.armBack, t),
+  }
+}
+
+function runLeg(phase: number, r: RunShape): Limb {
   const a = phase * Math.PI * 2
   const s = Math.sin(a) // 1 = 腳在最前、-1 = 腳在最後
   const c = Math.cos(a) // > 0 = 正往前收腿、< 0 = 正在往後推地
-  const thigh = (RUN_THIGH_FRONT + RUN_THIGH_BACK) / 2 + ((RUN_THIGH_FRONT - RUN_THIGH_BACK) / 2) * s
-  const mid = (RUN_KNEE_FRONT + RUN_KNEE_BACK) / 2
-  const bend =
-    mid +
-    ((RUN_KNEE_FRONT - RUN_KNEE_BACK) / 2) * s +
-    (RUN_KNEE_RECOVER - mid) * Math.max(0, c) -
-    (mid - RUN_KNEE_STANCE) * Math.max(0, -c)
+  const thigh = (r.thighFront + r.thighBack) / 2 + ((r.thighFront - r.thighBack) / 2) * s
+  const mid = (r.kneeFront + r.kneeBack) / 2
+  const bend = mid + ((r.kneeFront - r.kneeBack) / 2) * s + (r.kneeRecover - mid) * Math.max(0, c) - (mid - r.kneeStance) * Math.max(0, -c)
   return [thigh, thigh - bend]
 }
 
-/** 手跟著對側的腳：那隻腳在前（s = 1）時這隻手在前。 */
-function runArm(otherLegPhase: number): Limb {
+/** 手跟著對側的腳：那隻腳在前時這隻手在前。 */
+function runArm(otherLegPhase: number, r: RunShape): Limb {
   const t = (Math.sin(otherLegPhase * Math.PI * 2) + 1) / 2
-  return [
-    RUN_ARM_BACK[0] + (RUN_ARM_FORWARD[0] - RUN_ARM_BACK[0]) * t,
-    RUN_ARM_BACK[1] + (RUN_ARM_FORWARD[1] - RUN_ARM_BACK[1]) * t,
-  ]
+  return mixLimb(r.armBack, r.armForward, t)
 }
 
-/** 跑過 stride px 時的跑步姿勢。 */
-export function runPose(stride: number): Pose {
-  const phase = (((stride / RUN_CYCLE_DISTANCE) % 1) + 1) % 1
-  const other = (phase + 0.5) % 1
-  const flight = 2 * Math.abs(Math.sin(phase * Math.PI * 2))
-  return P(RUN_LEAN, runArm(other), runArm(phase), runLeg(phase), runLeg(other), flight)
+/** 跑步姿勢：phase 是跑步循環的相位（0～1），intensity 0 = 剛起跑的小跑步、1 = 全速。 */
+export function runPose(phase: number, intensity = 1): Pose {
+  const r = runShape(intensity)
+  const p = ((phase % 1) + 1) % 1
+  const other = (p + 0.5) % 1
+  const flight = mix(0.5, 2, Math.min(1, Math.max(0, intensity))) * Math.abs(Math.sin(p * Math.PI * 2))
+  return P(r.lean, runArm(other, r), runArm(p, r), runLeg(p, r), runLeg(other, r), flight)
 }
 
 /** 走過 stride px 時的走路姿勢。 */

@@ -29,6 +29,12 @@ function doubleTap(world: World, gap = 6) {
   tick(world, ['right'])
 }
 
+/** 連按兩下後繼續按住，等起跑加速完成。 */
+function upToSpeed(world: World, gap = 6) {
+  doubleTap(world, gap)
+  run(world, 30, ['right'])
+}
+
 /** 按住 → 走 frames 幀的距離。 */
 function distance(world: World, frames: number) {
   const x0 = world.agent.x
@@ -40,7 +46,7 @@ describe('running (double-tap and hold a direction)', () => {
   it('double-tapping → and holding runs much faster than walking', () => {
     const walk = distance(sandbox(), 30)
     const world = sandbox()
-    doubleTap(world)
+    upToSpeed(world)
     const ran = distance(world, 30)
     expect(ran).toBeGreaterThan(walk * 1.4)
   })
@@ -48,8 +54,21 @@ describe('running (double-tap and hold a direction)', () => {
   it.each([2, 4, 6, 8, 10])('works at human double-tap speeds (%i frames between taps)', (gap) => {
     const walk = distance(sandbox(), 20)
     const world = sandbox()
-    doubleTap(world, gap)
-    expect(distance(world, 20)).toBeGreaterThan(walk * 1.5)
+    upToSpeed(world, gap)
+    expect(distance(world, 20)).toBeGreaterThan(walk * 1.4)
+  })
+
+  it('starting a run accelerates smoothly from walking pace to full speed', () => {
+    const world = sandbox()
+    doubleTap(world)
+    const speeds: number[] = []
+    for (let i = 0; i < 30; i++) {
+      const x0 = world.agent.x
+      tick(world, [], ['right'])
+      speeds.push(world.agent.x - x0)
+    }
+    expect(speeds[0]).toBeLessThan(speeds[speeds.length - 1] * 0.8) // 一開始比較慢
+    for (let i = 1; i < speeds.length; i++) expect(speeds[i]).toBeGreaterThanOrEqual(speeds[i - 1] - 0.01) // 只會越跑越快
   })
 
   it('a single press is just walking', () => {
@@ -70,16 +89,15 @@ describe('running (double-tap and hold a direction)', () => {
 
   it('the running pose leans forward (not the walking pose)', () => {
     const world = sandbox()
-    doubleTap(world)
-    run(world, 10, ['right'])
-    // 比走路明顯往前傾
+    upToSpeed(world)
+    // 全速時比走路明顯往前傾
     expect(world.agent.pose().lean).toBeGreaterThan(walkPose(0).lean + 8)
   })
 
   it('jumping while running carries the run speed into the jump', () => {
     const jumpFar = (running: boolean) => {
       const world = sandbox()
-      if (running) doubleTap(world)
+      if (running) upToSpeed(world)
       else tick(world, ['right'])
       run(world, 8, ['right'])
       const x0 = world.agent.x

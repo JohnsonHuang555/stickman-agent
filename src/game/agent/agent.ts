@@ -7,7 +7,7 @@ import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { CROUCH_HEIGHT, STAND_HEIGHT, frontHand, lerpPose, poseBall, posePoints, type Pose } from '../stickman/pose'
-import { CLIPS, POSES, runPose, walkPose } from '../stickman/poses'
+import { CLIPS, JOG_CYCLE_DISTANCE, POSES, RUN_CYCLE_DISTANCE, runPose, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
 import { MOVES, type MoveId } from './moves'
@@ -17,6 +17,8 @@ import type { Grunt } from '../enemies/grunt'
 const WALK_SPEED = 2.1
 /** 連按兩下方向鍵（第二下按住）就跑步。 */
 const RUN_SPEED = 3.2
+/** 起跑後幾幀從小跑步加速到全速（速度、步伐、擺手、前傾一起增加）。 */
+const RUN_RAMP_FRAMES = 24
 /** 第二下按下後幾幀內還按著同方向，就開始跑。 */
 const RUN_START_WINDOW = 6
 /** 搬著櫃子時的移動速度倍率。 */
@@ -103,6 +105,9 @@ export class Agent extends Fighter {
   private crouching = false
   /** 正在跑步的方向（0 = 沒在跑）。 */
   private running: Facing | 0 = 0
+  /** 這次跑了幾幀（加速用）與跑步循環的相位。 */
+  private runFrames = 0
+  private runPhase = 0
   /** 剛連按兩下的方向；在 RUN_START_WINDOW 內還按著就開始跑。 */
   private runRequest: { dir: Facing; until: number } | null = null
   private walking = false
@@ -253,10 +258,19 @@ export class Agent extends Fighter {
     if (this.runRequest && this.runRequest.until >= now && dir === this.runRequest.dir) {
       this.running = dir
       this.runRequest = null
+      this.runFrames = 0
+      this.runPhase = 0.25 // 從前腳往前的姿勢開始跑
     }
     if (this.running && (dir !== this.running || this.crouching || this.carryingHeavy)) this.running = 0
     this.walking = !this.crouching && dir !== 0
-    const speed = this.running ? RUN_SPEED : WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1)
+    let speed = WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1)
+    if (this.running) {
+      this.runFrames++
+      const ramp = this.runIntensity
+      speed = WALK_SPEED + (RUN_SPEED - WALK_SPEED) * ramp
+      // 步伐跟著速度變大：小跑步時一步短、全速時一步長，手腳擺動的節奏維持自然
+      this.runPhase += speed / (JOG_CYCLE_DISTANCE + (RUN_CYCLE_DISTANCE - JOG_CYCLE_DISTANCE) * ramp)
+    }
     this.vx = this.walking ? dir * speed : 0
     if (dir) this.facing = dir
   }
@@ -350,6 +364,11 @@ export class Agent extends Fighter {
     }
   }
 
+  /** 起跑加速的進度：0 = 剛起跑、1 = 全速。 */
+  private get runIntensity(): number {
+    return Math.min(1, this.runFrames / RUN_RAMP_FRAMES)
+  }
+
   private wantsCrouch(): boolean {
     return !this.airborne && this.buttons.has('down') && !(this.held && categoryOf(this.held) === 'throwable')
   }
@@ -441,7 +460,7 @@ export class Agent extends Fighter {
 
   private startJump(dir: -1 | 0 | 1): void {
     if (dir) this.facing = dir
-    this.vx = dir * (this.running === dir && dir ? RUN_SPEED : AIR_DRIFT)
+    this.vx = dir * (this.running === dir && dir ? Math.max(AIR_DRIFT, WALK_SPEED + (RUN_SPEED - WALK_SPEED) * this.runIntensity) : AIR_DRIFT)
     this.running = 0
     this.vh = JUMP_VELOCITY
     this.crouching = false
@@ -874,7 +893,7 @@ export class Agent extends Fighter {
           return this.withHoldArms(lerpPose(POSES.jumpUp, POSES.jumpFall, t * t * (3 - 2 * t)))
         }
         if (this.crouching) return CLIPS.crouch.sample(0)
-        if (this.running) return this.withHoldArms(runPose(this.stride))
+        if (this.running) return this.withHoldArms(runPose(this.runPhase, this.runIntensity))
         if (this.walking) return this.withHoldArms(walkPose(this.stride))
         return this.withHoldArms(CLIPS.idle.sample(this.animFrame))
     }

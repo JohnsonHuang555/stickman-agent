@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { posePoints, type Pose } from './pose'
-import { ATTACK_POSES, HOLD_ARMS, POSES, RUN_CYCLE_DISTANCE, WALK_CYCLE_DISTANCE, runPose, walkPose } from './poses'
+import { ATTACK_POSES, HOLD_ARMS, POSES, WALK_CYCLE_DISTANCE, runPose, walkPose } from './poses'
 
 /** 角度差正規化到 (-180, 180]。 */
 const diff = (a: number, b: number) => ((((a - b) % 360) + 540) % 360) - 180
@@ -115,7 +115,8 @@ describe('air kicks look like the title screen (regression for "the flying kick 
 })
 
 describe('run cycle (regression for "the running animation looks odd")', () => {
-  const frames = Array.from({ length: 60 }, (_, i) => runPose((RUN_CYCLE_DISTANCE * i) / 60))
+  // 全速與剛起跑兩種強度都檢查
+  const frames = [1, 0, 0.5].flatMap((intensity) => Array.from({ length: 60 }, (_, i) => runPose(i / 60, intensity)))
 
   it('knees and elbows only bend the natural way throughout the cycle', () => {
     for (const p of frames) {
@@ -137,12 +138,20 @@ describe('run cycle (regression for "the running animation looks odd")', () => {
     expect(diff(forward.legF[0], forward.legF[1])).toBeGreaterThan(40)
   })
 
-  it('motion is continuous: no joint jumps more than 15° between neighbouring frames (60 per cycle)', () => {
+  it.each([1, 0.5, 0])('motion is continuous at intensity %f: no joint jumps more than 15° between neighbouring frames (60 per cycle)', (intensity) => {
+    const cycle = Array.from({ length: 60 }, (_, i) => runPose(i / 60, intensity))
     const joints = (p: Pose) => [...p.armF, ...p.armB, ...p.legF, ...p.legB]
-    for (let i = 0; i < frames.length; i++) {
-      const a = joints(frames[i])
-      const b = joints(frames[(i + 1) % frames.length])
+    for (let i = 0; i < cycle.length; i++) {
+      const a = joints(cycle[i])
+      const b = joints(cycle[(i + 1) % cycle.length])
       for (let j = 0; j < a.length; j++) expect(Math.abs(diff(a[j], b[j]))).toBeLessThan(15)
     }
+  })
+
+  it('a fresh run (jog) is more upright with smaller strides than full speed', () => {
+    const jog = runPose(0.25, 0)
+    const sprint = runPose(0.25, 1)
+    expect(jog.lean).toBeLessThan(sprint.lean)
+    expect(jog.legF[0]).toBeLessThan(sprint.legF[0])
   })
 })
