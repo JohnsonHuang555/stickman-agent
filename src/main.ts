@@ -4,7 +4,8 @@ import { Keyboard } from './engine/keyboard'
 import { startLoop } from './engine/loop'
 import { VIEW_H, VIEW_W } from './game/constants'
 import { World } from './game/world'
-import { LocalLeaderboard } from './leaderboard/leaderboard'
+import { FallbackLeaderboard, FirestoreLeaderboard, firestoreConfigFrom } from './leaderboard/firestore'
+import { LocalLeaderboard, type Leaderboard } from './leaderboard/leaderboard'
 import { loadNickname, saveNickname } from './leaderboard/profile'
 import { askNickname } from './ui/nicknameDialog'
 
@@ -39,6 +40,12 @@ function beginFrame() {
 const params = new URLSearchParams(location.search)
 
 /** 畫一張靜態頁面，並在尺寸改變或字型載入後重畫。 */
+/** 有設定 Firebase（環境變數）就用線上排行榜（本機備援），否則只用本機。 */
+function createLeaderboard(): Leaderboard {
+  const config = firestoreConfigFrom(import.meta.env)
+  return config ? new FallbackLeaderboard(new FirestoreLeaderboard(config), new LocalLeaderboard()) : new LocalLeaderboard()
+}
+
 function showStatic(draw: (ctx: CanvasRenderingContext2D) => void) {
   redrawStatic = () => {
     beginFrame()
@@ -91,7 +98,7 @@ if (import.meta.env.DEV && params.has('scene')) {
     const startFloor = import.meta.env.DEV ? Math.max(0, Number(params.get('floor') ?? 1) - 1) : 0
     const app = new App({
       worldOptions: { mode: 'campaign', startFloor },
-      leaderboard: new LocalLeaderboard(),
+      leaderboard: createLeaderboard(),
       askNickname,
       loadNickname,
       saveNickname,

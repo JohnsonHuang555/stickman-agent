@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// 排行榜：任何人都能讀；只能新增格式正確的成績，不能修改或刪除。
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /scores/{scoreId} {
+      allow list: if request.query.limit <= 50;
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['nickname', 'floor', 'score', 'at'])
+        && request.resource.data.keys().hasAll(['nickname', 'floor', 'score', 'at'])
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 1
+        && request.resource.data.nickname.size() <= 12
+        && request.resource.data.floor is int
+        && request.resource.data.floor >= 1
+        && request.resource.data.floor <= 4
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 9999999
+        && request.resource.data.at is int;
+      allow update, delete: if false;
+    }
+  }
+}
