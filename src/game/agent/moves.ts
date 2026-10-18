@@ -202,12 +202,13 @@ export const MOVES = {
   },
   /** 跑步中按 X：從地上低低跳起往前飛踢（擊倒），落地就結束。 */
   runKick: {
-    clip: attackClip(ATTACK_POSES.runKick, 3, 4, 20),
-    length: 30,
+    // 跳起來後一直維持踢出去的姿勢，落地才收腳（之前踢出 4 幀就開始收，空中大半時間腳都縮著）
+    clip: aerialClip(ATTACK_POSES.runKick, 3),
+    length: Infinity,
     aerial: true,
     hit: {
-      from: 4,
-      to: 22,
+      from: 3,
+      to: Infinity,
       box: { forward: 2, up: 4, w: 32, h: 16 },
       damage: 12,
       hitstun: 20,

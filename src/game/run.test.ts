@@ -154,3 +154,24 @@ describe('attacks out of a run', () => {
     expect(maxH).toBe(0)
   })
 })
+
+describe('running kick animation (regression for "the running kick animation is wrong")', () => {
+  it('the kicking leg stays fully extended for the whole time in the air, not just a few frames', () => {
+    const world = sandbox()
+    doubleTap(world)
+    run(world, 30, ['right'])
+    tick(world, ['kick'], ['right'])
+    let airFrames = 0
+    let extended = 0
+    for (let i = 0; i < 40; i++) {
+      tick(world)
+      if (world.agent.h <= 0) continue
+      airFrames++
+      const [thigh, shin] = world.agent.pose().legF
+      // 整條腿往前伸直（大腿與小腿都接近水平往前）
+      if (thigh > 75 && Math.abs(thigh - shin) < 15) extended++
+    }
+    expect(airFrames).toBeGreaterThan(10)
+    expect(extended).toBeGreaterThanOrEqual(airFrames - 3) // 只有起跳的前幾幀在收腳預備
+  })
+})
