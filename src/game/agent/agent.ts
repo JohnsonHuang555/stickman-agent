@@ -2,12 +2,12 @@ import type { ActionDef, ActionInstance, ActiveHit, Box, HitSpec } from '../comb
 import { GROUND_Y } from '../constants'
 import { Fighter } from '../fighter'
 import type { Button, InputBuffer, InputSnapshot } from '../input/buttons'
-import { SIMULTANEOUS_WINDOW, recognizeCommand, type Command, type CommandKind, type Facing } from '../input/commands'
+import { SIMULTANEOUS_WINDOW, doubleTapDirection, recognizeCommand, type Command, type CommandKind, type Facing } from '../input/commands'
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { CROUCH_HEIGHT, STAND_HEIGHT, frontHand, lerpPose, poseBall, posePoints, type Pose } from '../stickman/pose'
-import { CLIPS, POSES, walkPose } from '../stickman/poses'
+import { CLIPS, POSES, runPose, walkPose } from '../stickman/poses'
 import type { World } from '../world'
 import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
 import { MOVES, type MoveId } from './moves'
@@ -15,6 +15,10 @@ import type { Enemy } from '../enemies/enemy'
 import type { Grunt } from '../enemies/grunt'
 
 const WALK_SPEED = 2.1
+/** 連按兩下方向鍵（第二下按住）就跑步。 */
+const RUN_SPEED = 3.8
+/** 第二下按下後幾幀內還按著同方向，就開始跑。 */
+const RUN_START_WINDOW = 6
 /** 搬著櫃子時的移動速度倍率。 */
 const HEAVY_CARRY_SPEED = 0.5
 /** 搭配較小的重力：跳約 64px 高、滯空約 38 幀，方便空中連段。 */
@@ -63,6 +67,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   dashPunch: 'dashPunch',
   sweep: 'sweep',
   crouchPunch: 'crouchPunch',
+  runKick: 'runKick',
 }
 
 type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
@@ -96,6 +101,10 @@ export class Agent extends Fighter {
   private grabAt = -1
   private bagUntil = -1
   private crouching = false
+  /** 正在跑步的方向（0 = 沒在跑）。 */
+  private running: Facing | 0 = 0
+  /** 剛連按兩下的方向；在 RUN_START_WINDOW 內還按著就開始跑。 */
+  private runRequest: { dir: Facing; until: number } | null = null
   private walking = false
   private airAttackUsed = false
   /** 附近有浮空的敵人：空中招式會懸停、往上帶（空中連段輔助）。 */
@@ -121,8 +130,14 @@ export class Agent extends Fighter {
       up: this.buttons.has('up'),
       down: this.buttons.has('down'),
       held: this.buttons,
+      running: this.state === 'free' && !this.airborne ? this.running : 0,
     })
     if (cmd) this.buffered = { cmd, until: realFrame + COMMAND_BUFFER }
+    // 連按兩下 ← 或 →：準備跑步
+    const tapped = snapshot.pressed.includes('right') ? 1 : snapshot.pressed.includes('left') ? -1 : 0
+    if (tapped && doubleTapDirection(buffer.presses, realFrame) === tapped) {
+      this.runRequest = { dir: tapped, until: realFrame + RUN_START_WINDOW }
+    }
     if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
     if (snapshot.pressed.includes('grab')) {
       this.grabUntil = realFrame + COMMAND_BUFFER
@@ -234,8 +249,15 @@ export class Agent extends Fighter {
     }
 
     this.crouching = this.wantsCrouch()
+    // 跑步：連按兩下後還按著同方向就開始跑；放開、換方向、蹲下、搬重物就停下
+    if (this.runRequest && this.runRequest.until >= now && dir === this.runRequest.dir) {
+      this.running = dir
+      this.runRequest = null
+    }
+    if (this.running && (dir !== this.running || this.crouching || this.carryingHeavy)) this.running = 0
     this.walking = !this.crouching && dir !== 0
-    this.vx = this.walking ? dir * WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1) : 0
+    const speed = this.running ? RUN_SPEED : WALK_SPEED * (this.carryingHeavy ? HEAVY_CARRY_SPEED : 1)
+    this.vx = this.walking ? dir * speed : 0
     if (dir) this.facing = dir
   }
 
@@ -419,13 +441,15 @@ export class Agent extends Fighter {
 
   private startJump(dir: -1 | 0 | 1): void {
     if (dir) this.facing = dir
-    this.vx = dir * AIR_DRIFT
+    this.vx = dir * (this.running === dir && dir ? RUN_SPEED : AIR_DRIFT)
+    this.running = 0
     this.vh = JUMP_VELOCITY
     this.crouching = false
     this.walking = false
   }
 
   private startAction(def: ActionDef): void {
+    this.running = 0
     this.setState('action')
     this.act = { def, frame: 0, hitIds: new Set(), chainQueued: false }
     this.crouching = false
@@ -454,6 +478,7 @@ export class Agent extends Fighter {
   }
 
   private setState(state: AgentState): void {
+    if (state !== 'free') this.running = 0
     this.state = state
     this.stateFrame = 0
   }
@@ -821,7 +846,7 @@ export class Agent extends Fighter {
 
   private poseKey(): string {
     if (this.state !== 'free') return this.state
-    return this.airborne ? 'air' : this.crouching ? 'crouch' : this.walking ? 'walk' : 'idle'
+    return this.airborne ? 'air' : this.crouching ? 'crouch' : this.running ? 'run' : this.walking ? 'walk' : 'idle'
   }
 
   private targetPose(): Pose {
@@ -849,6 +874,7 @@ export class Agent extends Fighter {
           return this.withHoldArms(lerpPose(POSES.jumpUp, POSES.jumpFall, t * t * (3 - 2 * t)))
         }
         if (this.crouching) return CLIPS.crouch.sample(0)
+        if (this.running) return this.withHoldArms(runPose(this.stride))
         if (this.walking) return this.withHoldArms(walkPose(this.stride))
         return this.withHoldArms(CLIPS.idle.sample(this.animFrame))
     }

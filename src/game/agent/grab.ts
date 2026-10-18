@@ -22,15 +22,15 @@ export const GRAB = {
    * → 從腰部的高度開始轉，越轉越快（spinFrom～releaseAt）→ 依慣性甩出去。
    */
   swing: {
-    length: 68,
-    headbuttAt: 5,
-    fallFrom: 9,
+    length: 72,
+    headbuttAt: 9,
+    fallFrom: 13,
     /** 往後倒到平躺的那一幀；之後特務才把雙腳抓起來。 */
-    landAt: 14,
-    spinFrom: 18,
-    releaseAt: 58,
+    landAt: 18,
+    spinFrom: 22,
+    releaseAt: 62,
     turns: 2,
-    sweepFrom: 22,
+    sweepFrom: 26,
     /** 轉到最快時身體比水平再往上翹的角度（弧度）；一開始頭拖在地上。 */
     riseAngle: 0.25,
     /** 甩出去時往上飛的速度。 */
@@ -80,7 +80,7 @@ export const GRAB_CLIPS: Record<GrabMove, Clip> = {
   // 頭槌 → 彎身抓住雙腳（手在腰部）→ 越轉越快手被甩得往外抬 → 甩出去後站回來
   swing: new Clip([
     { pose: clinch, dur: 2 },
-    { pose: ATTACK_POSES.headbutt[0], dur: SW.headbuttAt - 2, blend: 3 },
+    { pose: ATTACK_POSES.headbutt[0], dur: SW.headbuttAt - 2, blend: 5 },
     { pose: ATTACK_POSES.headbutt[1], dur: SW.fallFrom - SW.headbuttAt + 1, blend: 2 },
     { pose: swingLow, dur: SW.spinFrom - SW.fallFrom - 1, blend: SW.spinFrom - SW.fallFrom - 1 },
     { pose: swingHigh, dur: SW.releaseAt - SW.spinFrom, blend: SW.releaseAt - SW.spinFrom },

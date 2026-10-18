@@ -227,7 +227,7 @@ describe('grab moves', () => {
     for (const [pressed, held] of [[['kick'], []], [['kick'], ['left']], [['jump'], []]] as [Button[], Button[]][]) {
       const { world } = grabbed()
       tick(world, pressed, held)
-      run(world, 70)
+      run(world, 90)
       const x0 = world.agent.x
       run(world, 20, ['right'])
       expect(world.agent.x).toBeGreaterThan(x0 + 20)

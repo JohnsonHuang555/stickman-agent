@@ -14,6 +14,7 @@ export type CommandKind =
   | 'dashPunch'
   | 'sweep'
   | 'crouchPunch'
+  | 'runKick'
 
 export interface Command {
   kind: CommandKind
@@ -36,6 +37,8 @@ export interface CommandContext {
   up?: boolean
   /** 正按著 ↓（空中下砸拳）。 */
   down?: boolean
+  /** 正在跑步的方向：Z 變衝刺拳、X 變跑步飛踢。 */
+  running?: Facing | 0
   /** 目前壓著的按鍵；保命招需要三鍵同時壓住。省略時不檢查。 */
   held?: ReadonlySet<Button>
 }
@@ -69,6 +72,7 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
   if (!punch && !kick) return null
   // 蹲著：Z 蹲拳（腿不動）、X 掃腿（不會站起來）
   if (ctx.crouching) return { kind: kick ? 'sweep' : 'crouchPunch' }
+  if (ctx.running) return kick ? { kind: 'runKick', dir: ctx.running } : { kind: 'dashPunch', dir: ctx.running }
   if (kick) return { kind: 'kick' }
   if (ctx.up) return { kind: 'launcher' }
 

@@ -14,6 +14,10 @@ const punchStep = (f: Fighter, frame: number) => {
   f.vx = frame >= 1 && frame <= 3 ? f.facing * 1 : 0
 }
 
+/** 跑步飛踢：往前的速度與跳起的高度（約跳 20px、飛 75px）。 */
+const RUN_KICK_SPEED = 4.2
+const RUN_KICK_HOP = 3.4
+
 /** 挑空技把雜兵打上空中的初速。 */
 // 搭配浮空上升重力 0.22：最高約 71px，接近特務跳躍的最高點
 export const LAUNCH_VELOCITY = 5.6
@@ -185,6 +189,26 @@ export const MOVES = {
     },
     tick: (f, frame) => {
       f.vx = frame > 14 ? 0 : f.vx * 0.94
+    },
+  },
+  /** 跑步中按 X：從地上低低跳起往前飛踢（擊倒），落地就結束。 */
+  runKick: {
+    clip: attackClip(ATTACK_POSES.runKick, 3, 4, 20),
+    length: 30,
+    aerial: true,
+    hit: {
+      from: 4,
+      to: 22,
+      box: { forward: 2, up: 4, w: 32, h: 16 },
+      damage: 12,
+      hitstun: 20,
+      knockback: 3,
+      knockdown: true,
+      heavy: true,
+    },
+    onStart: (f) => {
+      f.vx = f.facing * RUN_KICK_SPEED
+      f.vh = RUN_KICK_HOP
     },
   },
   /** ↓+Z：蹲著出拳，腿不動、身體維持低姿勢，可以連按。 */

@@ -1,5 +1,5 @@
 import { Clip, still } from './clip'
-import { BODY, type Limb, type Pose } from './pose'
+import { BODY, lerpPose, type Limb, type Pose } from './pose'
 
 const P = (lean: number, armF: Limb, armB: Limb, legF: Limb, legB: Limb, lift = 0): Pose => ({
   lean,
@@ -79,6 +79,28 @@ function footAt(phase: number): { x: number; lift: number } {
   if (phase < 0.5) return { x: STEP_HALF - 4 * STEP_HALF * phase, lift: 0 }
   const t = (phase - 0.5) / 0.5
   return { x: -STEP_HALF + 2 * STEP_HALF * t, lift: SWING_LIFT * Math.sin(Math.PI * t) }
+}
+
+/*
+ * 跑步：身體前傾、手臂前後大幅擺動（手肘彎著）、腳步大、後腳往後踢高。
+ * 四個關鍵姿勢依跑過的距離循環補間：前腳著地 → 換腳騰空 → 另一腳著地 → 換腳騰空。
+ */
+export const RUN_CYCLE_DISTANCE = 60
+const RUN_KEYS: readonly Pose[] = [
+  // 右腳（前腳）往前伸著地、左腳往後踢高；手和腳反向
+  P(22, [-45, 30], [55, 140], [55, 15], [-40, -105]),
+  // 換腳騰空：前腳收到身體下方、後腳膝蓋往前抬
+  P(24, [5, 95], [15, 100], [-5, -45], [70, -10]),
+  // 左腳往前著地、右腳往後踢高
+  P(22, [55, 140], [-45, 30], [-40, -105], [55, 15]),
+  P(24, [15, 100], [5, 95], [70, -10], [-5, -45]),
+]
+
+/** 跑過 stride px 時的跑步姿勢。 */
+export function runPose(stride: number): Pose {
+  const t = ((((stride / RUN_CYCLE_DISTANCE) % 1) + 1) % 1) * RUN_KEYS.length
+  const i = Math.floor(t)
+  return lerpPose(RUN_KEYS[i], RUN_KEYS[(i + 1) % RUN_KEYS.length], t - i)
 }
 
 /** 走過 stride px 時的走路姿勢。 */
@@ -200,6 +222,8 @@ export const ATTACK_POSES = {
   aim: [P(4, [88, 90], [20, 140], STANCE_F, STANCE_B), P(-4, [100, 110], [20, 140], [22, 8], [-18, -30])],
   /** 雙手由頭後方往前丟出。 */
   throw: [P(-15, [-160, -130], [-150, -120], [15, 0], [-25, -40]), P(25, [110, 120], [100, 115], [35, 5], [-30, -45])],
+  /** 跑步飛踢：[起跳收腳, 整條腿往前踢出]，從地上跳起來低低地往前踢。 */
+  runKick: [P(10, [40, 140], [-30, 10], [80, -10], [-10, -50]), P(-15, [-40, -10], [-60, -30], [88, 88], [10, -70])],
   /** 抓住敵人：雙手往前抓著，身體微微前傾。 */
   clinch: [P(12, [80, 100], [70, 105], STANCE_F, STANCE_B)],
   /** 抓著膝撞：雙手把對方往下拉、膝蓋往上頂。 */
