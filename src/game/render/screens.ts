@@ -30,6 +30,30 @@ function dim(ctx: CanvasRenderingContext2D, alpha: number): void {
   ctx.fillRect(0, 0, VIEW_W, VIEW_H)
 }
 
+/** 標題選單顯示的中文（程式內部仍用英文代號）。 */
+const TITLE_LABELS: Record<(typeof TITLE_MENU)[number], string> = {
+  START: '開始遊戲',
+  SURVIVAL: '生存模式',
+  PRACTICE: '練習模式',
+  LEADERBOARD: '排行榜',
+  SETTINGS: '設定',
+  NICKNAME: '暱稱',
+}
+
+const CJK_FONT = '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", "Heiti TC", sans-serif'
+
+/** 中文字（粗體、黑色陰影），置中，y 為字的上緣。 */
+function cjkText(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color: string): void {
+  ctx.font = `bold ${size}px ${CJK_FONT}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  const shadow = Math.max(1, Math.round(size / 12))
+  ctx.fillStyle = '#000'
+  ctx.fillText(s, x + shadow, y + shadow)
+  ctx.fillStyle = color
+  ctx.fillText(s, x, y)
+}
+
 export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nickname: string | null, frame: number): void {
   drawBackground(ctx, 'office', frame * 0.3, null, frame)
   dim(ctx, 0.45)
@@ -37,14 +61,15 @@ export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nicknam
   drawStickman(ctx, ATTACK_POSES.flyingKick[1], 90, GROUND_Y - 30, 1, { body: '#111111', back: '#4a4a4a' }, 1.6)
   titleBoss.draw(ctx, 0)
 
-  text(ctx, 'STICKMAN', VIEW_W / 2, 34, 24, 'center')
-  text(ctx, 'AGENT', VIEW_W / 2, 64, 24, 'center')
+  // 標題：像素字型沒有中文字，改用粗體中文字型
+  cjkText(ctx, '火柴人特務', VIEW_W / 2, 26, 40, '#ffffff')
+  cjkText(ctx, '黑幫大樓', VIEW_W / 2, 74, 16, '#f5c518')
 
   TITLE_MENU.forEach((item, i) => {
-    const y = 128 + i * 18
-    const label = item === 'NICKNAME' ? `NAME: ${nickname ?? '---'}` : item
-    text(ctx, label, VIEW_W / 2, y, 8, 'center')
-    if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', VIEW_W / 2 - 80, y, 8, 'left')
+    const y = 122 + i * 18
+    const label = item === 'NICKNAME' ? `暱稱：${nickname ?? '---'}` : TITLE_LABELS[item]
+    cjkText(ctx, label, VIEW_W / 2, y, 11, '#ffffff')
+    if (i === cursor && Math.floor(frame / 15) % 2 === 0) text(ctx, '▶', VIEW_W / 2 - 70, y + 2, 8, 'left')
   })
 
   ctx.font = '7px monospace'
