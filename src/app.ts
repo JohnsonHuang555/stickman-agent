@@ -1,10 +1,11 @@
 import { musicFor, type MusicTrack } from './audio/music'
 import type { Sound } from './audio/sfx'
 import type { InputSnapshot } from './game/input/buttons'
-import { PAUSE_MENU, SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle, type SettingsItem } from './game/render/screens'
+import { PAUSE_MENU, SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle, usingTouchHints, type SettingsItem } from './game/render/screens'
 import { World, type WorldOptions } from './game/world'
 import { ANONYMOUS, type Leaderboard, type LeaderboardEntry } from './leaderboard/leaderboard'
 import { DEFAULT_SETTINGS, adjustVolume, type Settings } from './settings'
+import { Tutorial } from './game/tutorial'
 
 const LEADERBOARD_SIZE = 10
 
@@ -36,7 +37,7 @@ export interface AppDeps {
  */
 type Screen =
   | { kind: 'title'; cursor: number }
-  | { kind: 'playing'; world: World }
+  | { kind: 'playing'; world: World; tutorial?: Tutorial }
   | { kind: 'dialog'; background: World | null }
   | { kind: 'leaderboard'; entries: LeaderboardEntry[] | null; highlight: LeaderboardEntry | null }
   | { kind: 'settings'; cursor: number }
@@ -88,7 +89,11 @@ export class App {
             if (this.pauseCursor !== before) this.quitArmed = false
           }
         }
-        if (world.restartRequested) void this.finishRun(world)
+        if (screen.tutorial) {
+          screen.tutorial.update(world)
+          // 練習模式不記成績：萬一倒下就重新開一個練習場，教學進度保留
+          if (world.restartRequested) this.screen = { kind: 'playing', world: this.newWorld({ mode: 'training' }), tutorial: screen.tutorial }
+        } else if (world.restartRequested) void this.finishRun(world)
         break
       }
       case 'settings': {
@@ -182,10 +187,9 @@ export class App {
   private choose(item: (typeof TITLE_MENU)[number]): void {
     this.deps.sound('select')
     if (item === 'START') {
-      const world = new World(this.deps.worldOptions)
-      world.sound = this.deps.sound
-      world.pauseOverlay = false
-      this.screen = { kind: 'playing', world }
+      this.screen = { kind: 'playing', world: this.newWorld(this.deps.worldOptions) }
+    } else if (item === 'PRACTICE') {
+      this.screen = { kind: 'playing', world: this.newWorld({ mode: 'training' }), tutorial: new Tutorial() }
     } else if (item === 'LEADERBOARD') {
       void this.showLeaderboard(null)
     } else if (item === 'SETTINGS') {
@@ -193,6 +197,13 @@ export class App {
     } else {
       void this.changeNickname()
     }
+  }
+
+  private newWorld(options: WorldOptions): World {
+    const world = new World(options)
+    world.sound = this.deps.sound
+    world.pauseOverlay = false
+    return world
   }
 
   private async changeNickname(): Promise<void> {
@@ -252,6 +263,7 @@ export class App {
         break
       case 'playing':
         screen.world.render(ctx)
+        screen.tutorial?.draw(ctx, this.frame, usingTouchHints())
         if (screen.world.paused) drawSettings(ctx, this.settings, this.pauseCursor, this.frame, true, this.quitArmed)
         break
       case 'settings':

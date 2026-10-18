@@ -144,6 +144,8 @@ export class World {
   private itemRespawnAt = 0
   private readonly particles = new Particles()
   readonly fx = new ImpactFx()
+  /** 這一幀特務打中的招式（練習模式判斷有沒有使出某個技巧）。 */
+  agentHits: HitSpec[] = []
   /** 剩下幾個實際幀的慢動作。 */
   slowmo = 0
   /** 最近一次閃身步閃過攻擊的實際幀（HUD 的提示動畫用）。 */
@@ -231,6 +233,7 @@ export class World {
   private stepSimulation(input: InputSnapshot): void {
     this.agent.readInput(input, this.buffer, this.realFrame)
     this.fx.update(this.realFrame)
+    this.agentHits = []
     if (this.hitstop > 0) {
       this.hitstop--
       return
@@ -519,6 +522,7 @@ export class World {
       }
       return
     }
+    if (attacker === this.agent) this.agentHits.push(spec)
     const wasAlive = !target.life.isDead
     const wasJuggled = target instanceof Grunt && target.juggled
     const barsBefore = target.life.barsRemaining

@@ -610,6 +610,16 @@ export class Agent extends Fighter {
     return this.state === 'down' && this.life.isDead && this.stateFrame > 60
   }
 
+  /** 正在跑步。 */
+  get isRunning(): boolean {
+    return this.running !== 0
+  }
+
+  /** 正抓著敵人。 */
+  get isGrabbing(): boolean {
+    return this.state === 'grab'
+  }
+
   /** 正在閃身步。 */
   get isDodging(): boolean {
     const def = this.act?.def

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { App, type AppDeps } from './app'
 import type { Button } from './game/input/buttons'
+import { TITLE_MENU } from './game/render/screens'
 import { CLEARED_FLOOR, LocalLeaderboard } from './leaderboard/leaderboard'
 
 function memoryStore() {
@@ -46,7 +47,7 @@ describe('App flow', () => {
     const { app } = makeApp()
     expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
     press(app, 'up')
-    expect(app.screen).toEqual({ kind: 'title', cursor: 3 })
+    expect(app.screen).toEqual({ kind: 'title', cursor: TITLE_MENU.length - 1 })
     press(app, 'down')
     expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
   })
@@ -124,12 +125,12 @@ describe('App flow', () => {
     await settle()
     expect(app.nickname).toBe('NEW')
     expect(deps.saveNickname).toHaveBeenCalledWith('NEW')
-    expect(app.screen).toEqual({ kind: 'title', cursor: 3 })
+    expect(app.screen).toEqual({ kind: 'title', cursor: TITLE_MENU.length - 1 })
   })
 
   it('LEADERBOARD on the title shows the board without a highlight', async () => {
     const { app } = makeApp()
-    press(app, 'down')
+    for (let i = 0; i < TITLE_MENU.indexOf('LEADERBOARD'); i++) press(app, 'down')
     press(app, 'confirm')
     await settle()
     expect(app.screen).toMatchObject({ kind: 'leaderboard', highlight: null, entries: [] })

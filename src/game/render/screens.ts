@@ -12,8 +12,9 @@ let touchHints = false
 export function useTouchHints(on: boolean): void {
   touchHints = on
 }
+export const usingTouchHints = () => touchHints
 
-export const TITLE_MENU = ['START', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
+export const TITLE_MENU = ['START', 'PRACTICE', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
 /** 從標題進入的設定畫面：DONE 顯示為 BACK。 */
 export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
 /** 遊戲中暫停的面板：DONE 顯示為 RESUME，多一個回到主畫面。 */

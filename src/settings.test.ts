@@ -120,7 +120,7 @@ describe('settings screen', () => {
     expect(app.quitArmed).toBe(true)
     press(app, 'confirm')
     expect(app.screen).toEqual({ kind: 'title', cursor: 0 })
-    press(app, 'down')
+    for (let i = 0; i < TITLE_MENU.indexOf('LEADERBOARD'); i++) press(app, 'down')
     press(app, 'confirm') // LEADERBOARD
     await new Promise((r) => setTimeout(r, 0))
     expect(app.screen).toMatchObject({ kind: 'leaderboard', entries: [] })
