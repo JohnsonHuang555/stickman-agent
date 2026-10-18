@@ -1,4 +1,4 @@
-import { ANONYMOUS, floorLabel, type LeaderboardEntry } from '../../leaderboard/leaderboard'
+import { ANONYMOUS, floorLabel, type BoardKind, type LeaderboardEntry } from '../../leaderboard/leaderboard'
 import { CONTROL_GROUPS, type Settings } from '../../settings'
 import { GROUND_Y, VIEW_H, VIEW_W } from '../constants'
 import { Boss } from '../enemies/boss'
@@ -14,7 +14,7 @@ export function useTouchHints(on: boolean): void {
 }
 export const usingTouchHints = () => touchHints
 
-export const TITLE_MENU = ['START', 'PRACTICE', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
+export const TITLE_MENU = ['START', 'SURVIVAL', 'PRACTICE', 'LEADERBOARD', 'SETTINGS', 'NICKNAME'] as const
 /** 從標題進入的設定畫面：DONE 顯示為 BACK。 */
 export const SETTINGS_MENU = ['MUSIC', 'SFX', 'DONE'] as const
 /** 遊戲中暫停的面板：DONE 顯示為 RESUME，多一個回到主畫面。 */
@@ -58,10 +58,21 @@ export function drawLeaderboard(
   entries: readonly LeaderboardEntry[] | null,
   highlight: LeaderboardEntry | null,
   frame: number,
+  board: BoardKind = 'story',
 ): void {
   drawBackground(ctx, 'casino', frame * 0.3, null, frame)
   dim(ctx, 0.7)
-  text(ctx, 'LEADERBOARD', VIEW_W / 2, 16, 16, 'center')
+  text(ctx, 'LEADERBOARD', VIEW_W / 2, 10, 16, 'center')
+  // 分頁：故事模式／生存模式（目前這頁亮著）
+  const tabs: [BoardKind, string][] = [['story', 'STORY'], ['survival', 'SURVIVAL']]
+  tabs.forEach(([kind, label], i) => {
+    const x = VIEW_W / 2 + (i === 0 ? -60 : 60)
+    if (kind === board) {
+      ctx.fillStyle = 'rgba(245,197,24,0.85)'
+      ctx.fillRect(x - 46, 30, 92, 12)
+    }
+    text(ctx, label, x, 32, 7, 'center')
+  })
 
   if (!entries) {
     text(ctx, 'LOADING...', VIEW_W / 2, VIEW_H / 2, 8, 'center')
@@ -69,12 +80,12 @@ export function drawLeaderboard(
     text(ctx, 'NO RECORDS YET', VIEW_W / 2, VIEW_H / 2, 8, 'center')
   } else {
     const cols = { rank: 70, name: 100, floor: 300, score: 410 }
-    text(ctx, 'RANK', cols.rank, 46, 6)
-    text(ctx, 'NAME', cols.name, 46, 6)
-    text(ctx, 'FLOOR', cols.floor, 46, 6)
-    text(ctx, 'SCORE', cols.score, 46, 6, 'right')
+    text(ctx, 'RANK', cols.rank, 50, 6)
+    text(ctx, 'NAME', cols.name, 50, 6)
+    text(ctx, board === 'survival' ? 'WAVE' : 'FLOOR', cols.floor, 50, 6)
+    text(ctx, 'SCORE', cols.score, 50, 6, 'right')
     entries.forEach((e, i) => {
-      const y = 62 + i * 16
+      const y = 64 + i * 16
       const mine = highlight && e.at === highlight.at && e.nickname === highlight.nickname && e.score === highlight.score
       if (mine) {
         if (Math.floor(frame / 15) % 2 === 0) {
@@ -84,7 +95,7 @@ export function drawLeaderboard(
       }
       text(ctx, String(i + 1).padStart(2, ' '), cols.rank, y, 8)
       text(ctx, e.nickname || ANONYMOUS, cols.name, y, 8)
-      text(ctx, floorLabel(e.floor), cols.floor, y, 8)
+      text(ctx, board === 'survival' ? String(e.floor) : floorLabel(e.floor), cols.floor, y, 8)
       text(ctx, String(e.score).padStart(6, '0'), cols.score, y, 8, 'right')
     })
   }
@@ -92,7 +103,7 @@ export function drawLeaderboard(
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText(touchHints ? '拳 返回' : 'J / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText(touchHints ? '搖桿左右切換   拳 返回' : 'A D 切換   J / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
 }
 
 /**

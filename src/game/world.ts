@@ -18,6 +18,7 @@ import { categoryOf, newItem, type Item, type ItemTypeId } from './items/itemTyp
 import { FLOORS, type FloorDef, type Spawn, type Theme } from './level/floors'
 import { Crate } from './level/crate'
 import { ZoneDirector } from './level/zoneDirector'
+import { SURVIVAL, SurvivalDirector, survivalDrop, survivalTheme } from './level/survival'
 import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
 import { ImpactFx } from './render/impact'
@@ -78,9 +79,10 @@ const SHOTGUN_PELLET: HitSpec = {
 /**
  * - campaign：正式遊玩，從 1F 往上打
  * - training：練習場，雜兵與物件持續重生
+ * - survival：生存模式，單一畫面的場地一波接一波
  * - sandbox：空地板，測試用
  */
-export type GameMode = 'campaign' | 'training' | 'sandbox'
+export type GameMode = 'campaign' | 'training' | 'sandbox' | 'survival'
 
 /**
  * - intro：剛進樓層，顯示樓層字卡（遊戲照常進行）
@@ -132,6 +134,8 @@ export class World {
   floorIndex = 0
   floor: FloorDef | null = null
   director: ZoneDirector | null = null
+  /** 生存模式的波次控制；其他模式為 null。 */
+  survival: SurvivalDirector | null = null
   phase: Phase = 'play'
   phaseFrame = 0
   /** 本層已經過的幀數（算用時獎勵）。 */
@@ -158,6 +162,10 @@ export class World {
     this.mode = options.mode ?? 'campaign'
     if (this.mode === 'campaign') {
       this.loadFloor(options.startFloor ?? 0)
+    } else if (this.mode === 'survival') {
+      this.survival = new SurvivalDirector()
+      this.floorWidth = WORLD_VIEW_W
+      this.agent.x = WORLD_VIEW_W / 2
     } else if (this.mode === 'training') {
       this.enemies.push(new Grunt(260, 'thug'), new Grunt(330, 'bruiser'))
       const layout: [ItemTypeId, number][] = [
@@ -170,11 +178,14 @@ export class World {
 
   /** 這一局的成績：到達樓層（通關為 CLEARED_FLOOR）與分數。 */
   get result(): { floor: number; score: number; cleared: boolean } {
+    // 生存模式：「樓層」欄位記撐到第幾波
+    if (this.survival) return { floor: Math.max(1, this.survival.wave), score: this.score, cleared: false }
     const cleared = this.phase === 'complete'
     return { floor: cleared ? CLEARED_FLOOR : this.floorIndex + 1, score: this.score, cleared }
   }
 
   get theme(): Theme {
+    if (this.survival) return survivalTheme(this.survival.wave)
     return this.floor?.theme ?? 'lobby'
   }
 
@@ -269,6 +280,7 @@ export class World {
 
     if (this.mode === 'training') this.respawnTraining()
     if (this.director && !this.gameOver) this.runDirector()
+    if (this.survival && !this.gameOver) this.runSurvival()
     this.confineToLock()
     if (this.agent.defeated && !this.gameOver) {
       this.gameOver = true
@@ -313,6 +325,24 @@ export class World {
       this.setPhase('clear')
       this.sound('clear')
     }
+  }
+
+  /** 生存模式：出下一批敵人；清完一波給獎勵、回一點血，新的一波開始時掉一樣東西。 */
+  private runSurvival(): void {
+    const s = this.survival!
+    const alive = this.enemies.filter((e) => !e.isGone).length
+    const { spawns, waveCleared, waveStarted } = s.update(this.realFrame, alive)
+    if (waveCleared) {
+      this.score += SURVIVAL.bonus * s.wave
+      this.agent.life.heal(Math.round(this.agent.life.max * SURVIVAL.heal))
+      this.popup(this.agent.x, `WAVE ${s.wave} CLEAR +${SURVIVAL.bonus * s.wave}`, '#ffe36b')
+      this.sound('clear')
+    }
+    if (waveStarted) {
+      this.placeItem(survivalDrop(s.wave), 40 + Math.random() * (WORLD_VIEW_W - 80))
+      if (s.wave > 1) this.sound('warning')
+    }
+    for (const spawn of spawns) this.spawn(spawn)
   }
 
   /** 從目前畫面（或鎖定區段）的左右邊緣外出場。 */

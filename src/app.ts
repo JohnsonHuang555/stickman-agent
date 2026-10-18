@@ -3,7 +3,7 @@ import type { Sound } from './audio/sfx'
 import type { InputSnapshot } from './game/input/buttons'
 import { PAUSE_MENU, SETTINGS_MENU, TITLE_MENU, drawLeaderboard, drawSettings, drawTitle, usingTouchHints, type SettingsItem } from './game/render/screens'
 import { World, type WorldOptions } from './game/world'
-import { ANONYMOUS, type Leaderboard, type LeaderboardEntry } from './leaderboard/leaderboard'
+import { ANONYMOUS, type BoardKind, type Leaderboard, type LeaderboardEntry } from './leaderboard/leaderboard'
 import { DEFAULT_SETTINGS, adjustVolume, type Settings } from './settings'
 import { Tutorial } from './game/tutorial'
 
@@ -12,6 +12,8 @@ const LEADERBOARD_SIZE = 10
 export interface AppDeps {
   worldOptions: WorldOptions
   leaderboard: Leaderboard
+  /** 生存模式的排行榜；省略時和故事模式共用（測試用）。 */
+  survivalLeaderboard?: Leaderboard
   /** 跳出暱稱對話框；回傳 null 表示略過或取消。 */
   askNickname: (options: { initial: string | null; firstTime: boolean }) => Promise<string | null>
   loadNickname: () => string | null
@@ -39,7 +41,7 @@ type Screen =
   | { kind: 'title'; cursor: number }
   | { kind: 'playing'; world: World; tutorial?: Tutorial }
   | { kind: 'dialog'; background: World | null }
-  | { kind: 'leaderboard'; entries: LeaderboardEntry[] | null; highlight: LeaderboardEntry | null }
+  | { kind: 'leaderboard'; entries: LeaderboardEntry[] | null; highlight: LeaderboardEntry | null; board: BoardKind }
   | { kind: 'settings'; cursor: number }
 
 /** 整個遊戲的畫面流程。 */
@@ -111,7 +113,11 @@ export class App {
       case 'dialog':
         break
       case 'leaderboard':
-        if (pressed('punch', 'confirm', 'pause', 'jump')) {
+        if (pressed('left', 'right')) {
+          // 切換故事模式／生存模式
+          this.deps.sound('menu')
+          void this.showLeaderboard(null, screen.board === 'story' ? 'survival' : 'story')
+        } else if (pressed('punch', 'confirm', 'pause', 'jump')) {
           this.deps.sound('select')
           this.screen = { kind: 'title', cursor: 0 }
         }
@@ -188,6 +194,8 @@ export class App {
     this.deps.sound('select')
     if (item === 'START') {
       this.screen = { kind: 'playing', world: this.newWorld(this.deps.worldOptions) }
+    } else if (item === 'SURVIVAL') {
+      this.screen = { kind: 'playing', world: this.newWorld({ mode: 'survival' }) }
     } else if (item === 'PRACTICE') {
       this.screen = { kind: 'playing', world: this.newWorld({ mode: 'training' }), tutorial: new Tutorial() }
     } else if (item === 'LEADERBOARD') {
@@ -230,24 +238,30 @@ export class App {
       score: result.score,
       at: (this.deps.now ?? Date.now)(),
     }
-    this.screen = { kind: 'leaderboard', entries: null, highlight: entry }
+    const board: BoardKind = world.mode === 'survival' ? 'survival' : 'story'
+    this.screen = { kind: 'leaderboard', entries: null, highlight: entry, board }
     try {
-      await this.deps.leaderboard.submit(entry)
+      await this.board(board).submit(entry)
     } catch {
       // 上傳失敗仍然顯示排行榜
     }
-    await this.showLeaderboard(entry)
+    await this.showLeaderboard(entry, board)
   }
 
-  private async showLeaderboard(highlight: LeaderboardEntry | null): Promise<void> {
-    this.screen = { kind: 'leaderboard', entries: null, highlight }
+  private board(kind: BoardKind): Leaderboard {
+    return kind === 'survival' ? (this.deps.survivalLeaderboard ?? this.deps.leaderboard) : this.deps.leaderboard
+  }
+
+  private async showLeaderboard(highlight: LeaderboardEntry | null, board: BoardKind = 'story'): Promise<void> {
+    this.screen = { kind: 'leaderboard', entries: null, highlight, board }
     let entries: LeaderboardEntry[] = []
     try {
-      entries = await this.deps.leaderboard.top(LEADERBOARD_SIZE)
+      entries = await this.board(board).top(LEADERBOARD_SIZE)
     } catch {
       entries = []
     }
-    if (this.screen.kind === 'leaderboard') this.screen = { kind: 'leaderboard', entries, highlight }
+    // 讀取途中玩家可能已經切到另一頁或離開
+    if (this.screen.kind === 'leaderboard' && this.screen.board === board) this.screen = { kind: 'leaderboard', entries, highlight, board }
   }
 
   private setNickname(name: string): void {
@@ -274,7 +288,7 @@ export class App {
         else drawTitle(ctx, TITLE_MENU.indexOf('NICKNAME'), this.nickname, this.frame)
         break
       case 'leaderboard':
-        drawLeaderboard(ctx, screen.entries, screen.highlight, this.frame)
+        drawLeaderboard(ctx, screen.entries, screen.highlight, this.frame, screen.board)
         break
     }
   }

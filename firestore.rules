@@ -19,6 +19,21 @@ service cloud.firestore {
         && d.at is int;
     }
 
+    function validSurvival(d) {
+      return d.keys().hasOnly(['nickname', 'floor', 'score', 'at'])
+        && d.keys().hasAll(['nickname', 'floor', 'score', 'at'])
+        && d.nickname is string
+        && d.nickname.size() >= 1
+        && d.nickname.size() <= 12
+        && d.floor is int
+        && d.floor >= 1
+        && d.floor <= 9999
+        && d.score is int
+        && d.score >= 0
+        && d.score <= 99999999
+        && d.at is int;
+    }
+
     function beats(next, prev) {
       return next.floor > prev.floor || (next.floor == prev.floor && next.score > prev.score);
     }
@@ -28,6 +43,15 @@ service cloud.firestore {
       allow get: if true;
       allow create: if validScore(request.resource.data);
       allow update: if validScore(request.resource.data) && beats(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    // 生存模式：floor 欄位是撐到第幾波
+    match /survival/{scoreId} {
+      allow list: if request.query.limit <= 50;
+      allow get: if true;
+      allow create: if validSurvival(request.resource.data);
+      allow update: if validSurvival(request.resource.data) && beats(request.resource.data, resource.data);
       allow delete: if false;
     }
   }

@@ -55,17 +55,27 @@ interface KeyValueStore {
 }
 
 const STORAGE_KEY = 'stickman.leaderboard'
+
+/** 排行榜種類：故事模式（三層樓）與生存模式（撐幾波）。 */
+export type BoardKind = 'story' | 'survival'
 const KEEP = 50
 
 /** 存在瀏覽器 localStorage 的排行榜。讀寫失敗（私密模式等）時當作空的。 */
 export class LocalLeaderboard implements Leaderboard {
-  constructor(private readonly store: KeyValueStore | null = safeLocalStorage()) {}
+  private readonly key: string
+
+  constructor(
+    private readonly store: KeyValueStore | null = safeLocalStorage(),
+    kind: BoardKind = 'story',
+  ) {
+    this.key = kind === 'story' ? STORAGE_KEY : `${STORAGE_KEY}.${kind}`
+  }
 
   async submit(entry: LeaderboardEntry): Promise<void> {
     // 同一個暱稱只留最好的成績：破紀錄才會取代原本那筆
     const entries = bestPerNickname([...this.read(), entry]).slice(0, KEEP)
     try {
-      this.store?.setItem(STORAGE_KEY, JSON.stringify(entries))
+      this.store?.setItem(this.key, JSON.stringify(entries))
     } catch {
       // 寫不進去就算了，不影響遊戲
     }
@@ -77,7 +87,7 @@ export class LocalLeaderboard implements Leaderboard {
 
   private read(): LeaderboardEntry[] {
     try {
-      const raw = this.store?.getItem(STORAGE_KEY)
+      const raw = this.store?.getItem(this.key)
       const parsed: unknown = raw ? JSON.parse(raw) : []
       return Array.isArray(parsed) ? parsed.filter(isEntry) : []
     } catch {

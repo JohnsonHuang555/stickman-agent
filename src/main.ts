@@ -8,8 +8,8 @@ import { TouchControls, mergeInput, wantsTouchControls } from './engine/touch'
 import { startLoop } from './engine/loop'
 import { VIEW_H, VIEW_W } from './game/constants'
 import { World } from './game/world'
-import { FallbackLeaderboard, FirestoreLeaderboard, firestoreConfigFrom } from './leaderboard/firestore'
-import { LocalLeaderboard, type Leaderboard } from './leaderboard/leaderboard'
+import { FallbackLeaderboard, FirestoreLeaderboard, SCORES_COLLECTION, SURVIVAL_COLLECTION, firestoreConfigFrom } from './leaderboard/firestore'
+import { LocalLeaderboard, type BoardKind, type Leaderboard } from './leaderboard/leaderboard'
 import { loadNickname, saveNickname } from './leaderboard/profile'
 import { askNickname } from './ui/nicknameDialog'
 
@@ -56,9 +56,12 @@ const params = new URLSearchParams(location.search)
 
 /** 畫一張靜態頁面，並在尺寸改變或字型載入後重畫。 */
 /** 有設定 Firebase（環境變數）就用線上排行榜（本機備援），否則只用本機。 */
-function createLeaderboard(): Leaderboard {
+function createLeaderboard(kind: BoardKind = 'story'): Leaderboard {
   const config = firestoreConfigFrom(import.meta.env)
-  return config ? new FallbackLeaderboard(new FirestoreLeaderboard(config), new LocalLeaderboard()) : new LocalLeaderboard()
+  const local = new LocalLeaderboard(undefined, kind)
+  if (!config) return local
+  const collection = kind === 'survival' ? SURVIVAL_COLLECTION : SCORES_COLLECTION
+  return new FallbackLeaderboard(new FirestoreLeaderboard(config, undefined, collection), local)
 }
 
 /** 從主畫面捷徑（加入主畫面）開啟：本來就是全螢幕。 */
@@ -172,7 +175,8 @@ if (import.meta.env.DEV && params.has('scene')) {
         saveSettings(s)
       },
       worldOptions: { mode: 'campaign', startFloor },
-      leaderboard: createLeaderboard(),
+      leaderboard: createLeaderboard('story'),
+      survivalLeaderboard: createLeaderboard('survival'),
       askNickname,
       loadNickname,
       saveNickname,

@@ -11,6 +11,8 @@ export interface FirestoreConfig {
 }
 
 export const SCORES_COLLECTION = 'scores'
+/** 生存模式的排行榜存在另一個集合。 */
+export const SURVIVAL_COLLECTION = 'survival'
 /** 讀取時多抓一些再去掉重複的暱稱（舊資料可能有同名的多筆）；Firestore 規則上限 50。 */
 const QUERY_HEADROOM = 3
 const QUERY_MAX = 50
@@ -30,6 +32,7 @@ export class FirestoreLeaderboard implements Leaderboard {
   constructor(
     private readonly config: FirestoreConfig,
     private readonly fetchFn: Fetch = (input, init) => fetch(input, init),
+    private readonly collection: string = SCORES_COLLECTION,
   ) {
     this.base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(config.projectId)}/databases/(default)/documents`
   }
@@ -45,14 +48,14 @@ export class FirestoreLeaderboard implements Leaderboard {
     }
     // PATCH 到固定的文件：沒有就建立，有就覆蓋（不比原本好的會被規則擋下來，視為失敗即可）
     const id = encodeURIComponent(nicknameKey(entry.nickname))
-    await this.request(`${this.base}/${SCORES_COLLECTION}/${id}?key=${this.config.apiKey}`, body, 'PATCH')
+    await this.request(`${this.base}/${this.collection}/${id}?key=${this.config.apiKey}`, body, 'PATCH')
   }
 
   async top(limit: number): Promise<LeaderboardEntry[]> {
     // 需要複合索引：floor ↓、score ↓、at ↑（見 firestore.indexes.json）
     const query = {
       structuredQuery: {
-        from: [{ collectionId: SCORES_COLLECTION }],
+        from: [{ collectionId: this.collection }],
         orderBy: [
           { field: { fieldPath: 'floor' }, direction: 'DESCENDING' },
           { field: { fieldPath: 'score' }, direction: 'DESCENDING' },

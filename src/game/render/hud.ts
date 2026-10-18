@@ -144,6 +144,20 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     drawLifeBar(ctx, VIEW_W - 118, 18, 110, 5, focus.target.life)
   }
 
+  const survival = world.survival
+  if (survival && survival.wave > 0) {
+    text(ctx, `WAVE ${survival.wave}`, VIEW_W / 2, 8, 8, 'center')
+    // 新的一波開始：WAVE n 標題（淡入淡出）
+    const age = world.realFrame - survival.startedAt
+    if (age < 90) {
+      ctx.globalAlpha = Math.min(1, (90 - age) / 20)
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'
+      ctx.fillRect(0, VIEW_H / 2 - 30, VIEW_W, 48)
+      text(ctx, `WAVE ${survival.wave}`, VIEW_W / 2, VIEW_H / 2 - 22, 24, 'center')
+      ctx.globalAlpha = 1
+    }
+  }
+
   const floor = world.floor
   if (floor) {
     text(ctx, floor.label, VIEW_W / 2, 8, 8, 'center')
@@ -176,7 +190,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
     text(ctx, 'GAME OVER', VIEW_W / 2, VIEW_H / 2 - 30, 16, 'center')
-    text(ctx, `REACHED ${floorLabel(world.result.floor)}`, VIEW_W / 2, VIEW_H / 2 - 4, 8, 'center')
+    const reached = world.survival ? `WAVE ${world.result.floor}` : floorLabel(world.result.floor)
+    text(ctx, `REACHED ${reached}`, VIEW_W / 2, VIEW_H / 2 - 4, 8, 'center')
     text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2 + 12, 8, 'center')
     if (world.phaseFrame > 60 && Math.floor(world.realFrame / 30) % 2 === 0) {
       text(ctx, 'PRESS J', VIEW_W / 2, VIEW_H / 2 + 34, 8, 'center')
