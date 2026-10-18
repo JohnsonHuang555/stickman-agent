@@ -10,6 +10,14 @@ import type { World } from './world'
 
 let nextId = 1
 
+/** 要畫出來的位置與姿勢（慢動作補間用）。 */
+export interface FighterDisplay {
+  x: number
+  h: number
+  rotation: number
+  pose: Pose
+}
+
 const FLASH_PALETTE: Palette = { body: '#ffffff', back: '#dddddd' }
 
 /** 特務與所有敵人的共同基底：位置、物理、命條、持有物與繪圖。 */
@@ -138,26 +146,32 @@ export abstract class Fighter implements Hitter {
     return { x: this.x - w / 2, y: GROUND_Y - this.h - h, w, h }
   }
 
+  /** 慢動作時畫在兩個模擬幀之間的位置與姿勢；null 就照目前狀態畫。 */
+  display: FighterDisplay | null = null
+
   draw(ctx: CanvasRenderingContext2D, camX: number): void {
-    const x = this.x - camX
-    const pose = this.pose()
+    const d = this.display
+    const x = (d?.x ?? this.x) - camX
+    const pose = d?.pose ?? this.pose()
+    const h = d?.h ?? this.h
+    const rotation = d?.rotation ?? this.rotation
     ctx.globalAlpha = this.alpha * 0.25
     ctx.fillStyle = '#000'
     ctx.beginPath()
-    ctx.ellipse(x, GROUND_Y + 1, Math.max(4, 10 - this.h * 0.08) * this.scale, 2.5, 0, 0, Math.PI * 2)
+    ctx.ellipse(x, GROUND_Y + 1, Math.max(4, 10 - h * 0.08) * this.scale, 2.5, 0, 0, Math.PI * 2)
     ctx.fill()
     ctx.globalAlpha = this.alpha
     const palette = this.flash > 0 ? FLASH_PALETTE : this.palette
-    const footY = GROUND_Y - this.h
+    const footY = GROUND_Y - h
     ctx.save()
-    if (this.rotation) {
+    if (rotation) {
       // 把姿勢當成一顆球，繞它自己的中心轉；在地上翻滾時中心抬到離地一個半徑，
       // 最低點剛好貼著地面滾，不會被甩到半空或陷進地裡
-      const { pivotX, pivotY, lift } = spinPivot(pose, x, footY, this.facing, this.scale, this.rotation, this.h === 0)
+      const { pivotX, pivotY, lift } = spinPivot(pose, x, footY, this.facing, this.scale, rotation, h === 0)
       // 依序（由內而外）：繞姿勢中心旋轉，再整個往上移 lift 讓最低點貼地
       ctx.translate(0, -lift)
       ctx.translate(pivotX, pivotY)
-      ctx.rotate(this.rotation)
+      ctx.rotate(rotation)
       ctx.translate(-pivotX, -pivotY)
     }
     if (this.heldBack) drawItemHeld(ctx, this.heldBack.type, backHand(pose, x, footY, this.facing, this.scale))

@@ -9,7 +9,7 @@ import { Boss } from './enemies/boss'
 import { Enemy } from './enemies/enemy'
 import { ENEMY_TYPE_IDS } from './enemies/enemyTypes'
 import { Grunt } from './enemies/grunt'
-import type { Fighter } from './fighter'
+import type { Fighter, FighterDisplay } from './fighter'
 import { InputBuffer, type InputSnapshot } from './input/buttons'
 import type { Facing } from './input/commands'
 import { Bullet } from './items/bullet'
@@ -21,6 +21,7 @@ import { ZoneDirector } from './level/zoneDirector'
 import { drawBackground } from './render/background'
 import { drawHud } from './render/hud'
 import { ImpactFx } from './render/impact'
+import { lerpPose } from './stickman/pose'
 import { Particles } from './render/particles'
 
 const TRAINING_GRUNTS = 3
@@ -37,6 +38,7 @@ const BOSS_BANNER_FRAMES = 150
 const POPUP_FRAMES = 50
 /** 每次命中的基本分，乘上連擊倍率。 */
 const HIT_SCORE = 10
+const snapshot = (f: Fighter): FighterDisplay => ({ x: f.x, h: f.h, rotation: f.rotation, pose: f.pose() })
 /** 被打飛撞到牆時的額外傷害。 */
 const WALL_BOUNCE_DAMAGE = 6
 const MUZZLE_FRAMES = 5
@@ -136,6 +138,8 @@ export class World {
   readonly fx = new ImpactFx()
   /** 剩下幾個實際幀的慢動作。 */
   slowmo = 0
+  /** 慢動作中上一次模擬推進前的畫面狀態，與推進的實際幀；畫面在兩者之間補間，動作才不會一頓一頓。 */
+  private slowPrev: { at: number; camX: number; fighters: Map<Fighter, FighterDisplay> } | null = null
   private readonly buffer = new InputBuffer()
 
   constructor(options: WorldOptions = {}) {
@@ -225,6 +229,9 @@ export class World {
     if (this.slowmo > 0) {
       this.slowmo--
       if (this.slowmo % SLOWMO_RATE !== 0) return
+      this.slowPrev = { at: this.realFrame, camX: this.camX, fighters: new Map(this.fighters.map((f) => [f, snapshot(f)])) }
+    } else {
+      this.slowPrev = null
     }
     this.floorFrames++
 
@@ -702,7 +709,7 @@ export class World {
     if (this.shake > 0.5) {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
-    const camX = this.camX
+    const camX = this.applySlowmoDisplay()
     this.fx.applyZoom(ctx, camX, this.realFrame)
     drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame)
     for (const c of this.crates) c.draw(ctx, camX)
@@ -738,9 +745,41 @@ export class World {
       ctx.fillText(p.text, p.x - camX, y)
     }
     if (this.debug) this.drawBoxes(ctx, camX)
+    for (const f of this.fighters) f.display = null
     ctx.restore()
     this.fx.drawWhite(ctx, this.realFrame)
     drawHud(ctx, this)
+  }
+
+  /**
+   * 慢動作時，模擬每 SLOWMO_RATE 幀才推進一次；中間的幀把角色與鏡頭畫在上一步和這一步之間，
+   * 看起來是平順的慢動作而不是低幀率。回傳這一幀要用的鏡頭位置。
+   */
+  private applySlowmoDisplay(): number {
+    const prev = this.slowPrev
+    if (!prev) return this.camX
+    const t = Math.min(1, (this.realFrame - prev.at + 1) / SLOWMO_RATE)
+    if (t >= 1) return this.camX
+    for (const f of this.fighters) {
+      const a = prev.fighters.get(f)
+      if (!a) continue
+      const b = snapshot(f)
+      f.display = {
+        x: a.x + (b.x - a.x) * t,
+        h: a.h + (b.h - a.h) * t,
+        rotation: a.rotation + (b.rotation - a.rotation) * t,
+        pose: lerpPose(a.pose, b.pose, t),
+      }
+    }
+    return prev.camX + (this.camX - prev.camX) * t
+  }
+
+  /** 慢動作補間時角色實際畫出來的位置（測試用）。 */
+  displayX(f: Fighter): number {
+    this.applySlowmoDisplay()
+    const x = f.display?.x ?? f.x
+    for (const g of this.fighters) g.display = null
+    return x
   }
 
   private drawPickupPrompt(ctx: CanvasRenderingContext2D, camX: number): void {

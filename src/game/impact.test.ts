@@ -145,6 +145,23 @@ describe('finishing blow slow motion', () => {
     expect(world.floorFrames - after).toBe(30)
   })
 
+  it('slow motion is drawn smoothly: the flying enemy moves on screen every frame, not every 3rd (regression for "slow motion lags")', () => {
+    const { world, g } = lastEnemy()
+    tick(world, ['punch'])
+    for (let i = 0; i < 10 && world.slowmo === 0; i++) tick(world)
+    run(world, 10) // 頓幀結束、進入慢動作
+    expect(world.slowmo).toBeGreaterThan(0)
+    const xs: number[] = []
+    for (let i = 0; i < 12; i++) {
+      tick(world)
+      xs.push(world.displayX(g))
+    }
+    const steps = xs.slice(1).map((x, i) => Math.abs(x - xs[i]))
+    // 每一幀都有移動，而且每幀的移動量差不多（沒有「動、停、停」）
+    for (const d of steps) expect(d).toBeGreaterThan(0)
+    expect(Math.max(...steps)).toBeLessThan(Math.min(...steps) * 2.5)
+  })
+
   it('KO-ing an enemy while others are still standing does not slow time', () => {
     const { world, g } = lastEnemy()
     const other = new Grunt(world.agent.x - 60, 'thug', { passive: true })
