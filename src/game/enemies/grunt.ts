@@ -57,6 +57,7 @@ type GruntState =
   | 'fetch'
   | 'pickup'
   | 'hurt'
+  | 'grabbed'
   | 'launched'
   | 'juggled'
   | 'down'
@@ -199,6 +200,11 @@ export class Grunt extends Enemy {
       case 'hurt':
         this.vx *= 0.8
         if (this.stateFrame >= this.hitstun) this.setState('wait')
+        break
+      case 'grabbed':
+        // 被特務抓著：位置、旋轉都由特務決定
+        this.vx = 0
+        this.vh = 0
         break
       case 'launched':
       case 'juggled':
@@ -366,7 +372,7 @@ export class Grunt extends Enemy {
 
   hurtbox(): Box | null {
     const s = this.state
-    if (s === 'launched' || s === 'down' || s === 'getup' || s === 'dying') return null
+    if (s === 'launched' || s === 'down' || s === 'getup' || s === 'dying' || s === 'grabbed') return null
     return this.bodyBox(STAND_HEIGHT)
   }
 
@@ -386,6 +392,8 @@ export class Grunt extends Enemy {
     this.life.damage(spec.damage)
     this.flash = 4
     if (this.state === 'attack' && this.act?.def.armor && !this.life.isDead) return
+    if (this.state === 'grabbed' && !spec.knockdown && !this.life.isDead) return
+    this.rotation = this.state === 'grabbed' ? this.rotation : 0
 
     this.act = null
     this.planned = null
@@ -457,6 +465,43 @@ export class Grunt extends Enemy {
     return this.vh > 0 ? JUGGLE_RISE_GRAVITY : JUGGLE_FALL_GRAVITY
   }
 
+  /** 抓得住：在地上、正在硬直中（被打中的那一下）。 */
+  get grabbable(): boolean {
+    return this.state === 'hurt' && !this.airborne && !this.life.isDead
+  }
+
+  get isGrabbed(): boolean {
+    return this.state === 'grabbed'
+  }
+
+  /** 被特務抓住：手上的東西掉下來，停止一切動作。 */
+  seize(world: World): void {
+    world.dropHeld(this)
+    this.act = null
+    this.planned = null
+    this.vx = 0
+    this.vh = 0
+    this.setState('grabbed')
+  }
+
+  /** 抓著時由特務每幀擺放位置。 */
+  holdAt(x: number, h: number, facing: Facing, rotation: number): void {
+    this.x = x
+    this.h = h
+    this.facing = facing
+    this.rotation = rotation
+  }
+
+  /** 掙脫（抓太久、特務被打）：往後退開，短暫硬直。 */
+  breakFree(awayFrom: number): void {
+    if (this.state !== 'grabbed') return
+    this.rotation = 0
+    this.h = 0
+    this.setState('hurt')
+    this.hitstun = 12
+    this.vx = (this.x >= awayFrom ? 1 : -1) * 1.5
+  }
+
   /** 正在空中被追擊。 */
   get juggled(): boolean {
     return this.state === 'juggled'
@@ -494,6 +539,7 @@ export class Grunt extends Enemy {
       case 'attack':
         return this.act!.def.clip.sample(this.act!.frame)
       case 'hurt':
+      case 'grabbed':
         return CLIPS.hurt.sample(0)
       case 'launched':
       case 'juggled':

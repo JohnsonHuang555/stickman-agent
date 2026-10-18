@@ -9,7 +9,10 @@ import { LifePool } from '../life/lifePool'
 import { CROUCH_HEIGHT, STAND_HEIGHT, lerpPose, type Pose } from '../stickman/pose'
 import { CLIPS, POSES, walkPose } from '../stickman/poses'
 import type { World } from '../world'
+import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
 import { MOVES, type MoveId } from './moves'
+import type { Enemy } from '../enemies/enemy'
+import type { Grunt } from '../enemies/grunt'
 
 const WALK_SPEED = 2.1
 /** 搬著櫃子時的移動速度倍率。 */
@@ -62,7 +65,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   crouchPunch: 'crouchPunch',
 }
 
-type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup'
+type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
 
 export class Agent extends Fighter {
   readonly team = 'agent' as const
@@ -78,6 +81,14 @@ export class Agent extends Fighter {
   private poseKeyNow = 'idle'
   private shownPose: Pose = POSES.idleA
   private act: ActionInstance | null = null
+  /** 抓技：抓著的雜兵、目前的動作與幀數、已經膝撞幾下、大風車已掃到的敵人。 */
+  private grabbed: Grunt | null = null
+  private grabMove: GrabMove = 'hold'
+  private grabFrame = 0
+  private grabHoldFrames = 0
+  private knees = 0
+  private grabFacing: Facing = 1
+  private swingHits = new Set<number>()
   private buttons: ReadonlySet<Button> = new Set()
   private buffered: { cmd: Command; until: number } | null = null
   private jumpUntil = -1
@@ -135,6 +146,9 @@ export class Agent extends Fighter {
     switch (this.state) {
       case 'free':
         this.updateFree(cmd, now, world)
+        break
+      case 'grab':
+        this.updateGrab(cmd, now, world)
         break
       case 'action':
         this.updateAction(cmd, now, world)
@@ -198,6 +212,12 @@ export class Agent extends Fighter {
         this.setState('pickup')
         return
       }
+      // 空手、腳邊沒東西：抓住面前硬直中的雜兵
+      const target = this.held ? null : world.grabTarget(this)
+      if (target) {
+        this.startGrab(target, world)
+        return
+      }
     }
 
     const dir = this.heldDir()
@@ -227,6 +247,29 @@ export class Agent extends Fighter {
     if (act.frame <= JUMP_ATTACK_WINDOW) {
       const kind = act.def === MOVES.punch1 ? 'punch' : act.def === MOVES.kick ? 'kick' : null
       if (kind && this.tryJumpAttack(kind, now)) return
+    }
+
+    // 拳腳打中後的收招可以按 C 直接抓住被打得硬直的敵人
+    const spec = act.def.hit
+    const grabReady = this.grabUntil >= now && now - this.grabAt >= SIMULTANEOUS_WINDOW
+    if (grabReady && !this.held && !act.def.aerial && spec && act.frame > spec.to && act.hitIds.size > 0) {
+      // 和站著按 C 一樣：腳邊有東西先撿，沒有才抓人
+      const item = world.pickupCandidate(this)
+      if (item) {
+        this.grabUntil = -1
+        this.act = null
+        world.takeItem(item, this)
+        this.vx = 0
+        this.setState('pickup')
+        return
+      }
+      const target = world.grabTarget(this)
+      if (target) {
+        this.grabUntil = -1
+        this.act = null
+        this.startGrab(target, world)
+        return
+      }
     }
 
     act.def.tick?.(this, act.frame, world)
@@ -456,6 +499,7 @@ export class Agent extends Fighter {
   }
 
   receiveHit(spec: HitSpec, dir: Facing, world: World): void {
+    this.releaseGrab()
     this.life.damage(spec.damage)
     this.flash = 4
     this.act = null
@@ -496,6 +540,169 @@ export class Agent extends Fighter {
     this.shownPose = this.pose()
   }
 
+  // ── 抓技 ──────────────────────────────────────────
+
+  private startGrab(target: Grunt, world: World): void {
+    target.seize(world)
+    this.facing = target.x >= this.x ? 1 : -1
+    this.grabbed = target
+    this.vx = 0
+    this.walking = false
+    this.crouching = false
+    this.grabHoldFrames = 0
+    this.knees = 0
+    this.setGrabMove('hold')
+    this.setState('grab')
+    this.placeGrabbed()
+  }
+
+  private setGrabMove(move: GrabMove): void {
+    this.grabMove = move
+    this.grabFrame = 0
+    this.grabFacing = this.facing
+  }
+
+  /** 放開抓著的人（被打、抓太久）。 */
+  private releaseGrab(): void {
+    this.grabbed?.breakFree(this.x)
+    this.grabbed = null
+  }
+
+  private endGrab(): void {
+    this.releaseGrab()
+    this.setState('free')
+  }
+
+  private updateGrab(cmd: Command | null, now: number, world: World): void {
+    this.vx = 0
+    this.grabFrame++
+    // 抓著的人已經不在手上（被撞倒、被打死）：動作做完就回到自由狀態
+    if (this.grabbed && !this.grabbed.isGrabbed) this.grabbed = null
+
+    switch (this.grabMove) {
+      case 'hold': {
+        if (!this.grabbed) return this.endGrab()
+        if (++this.grabHoldFrames >= GRAB.hold) return this.endGrab()
+        const kind = cmd?.kind
+        if (kind === 'punch' || kind === 'launcher' || kind === 'dashPunch' || kind === 'crouchPunch') {
+          this.buffered = null
+          this.setGrabMove('knee')
+        } else if (kind === 'kick' || kind === 'sweep') {
+          this.buffered = null
+          const back = this.heldDir() === -this.facing
+          this.setGrabMove(back ? 'suplex' : 'throw')
+          if (back) this.invuln = GRAB.suplex.length
+        } else if (this.jumpUntil >= now) {
+          this.jumpUntil = -1
+          this.swingHits = new Set()
+          this.setGrabMove('swing')
+          this.invuln = GRAB.swing.length
+        }
+        break
+      }
+      case 'knee':
+        if (this.grabFrame === GRAB.knee.hitAt && this.grabbed) {
+          this.knees++
+          const last = this.knees >= GRAB.knee.max
+          this.grabHit(this.grabbed, last ? GRAB_HITS.lastKnee : GRAB_HITS.knee, this.facing, world)
+          if (this.grabbed && !this.grabbed.isGrabbed) this.grabbed = null
+        }
+        if (this.grabFrame >= GRAB.knee.length) {
+          if (!this.grabbed) return this.endGrab()
+          this.setGrabMove('hold')
+        }
+        break
+      case 'throw':
+        if (this.grabFrame === GRAB.throw.releaseAt && this.grabbed) {
+          const target = this.grabbed
+          this.grabbed = null
+          this.grabHit(target, GRAB_HITS.throw, this.facing, world)
+        }
+        if (this.grabFrame >= GRAB.throw.length) return this.endGrab()
+        break
+      case 'suplex':
+        if (this.grabFrame === GRAB.suplex.slamAt && this.grabbed) {
+          const target = this.grabbed
+          this.grabbed = null
+          target.holdAt(this.x - this.grabFacing * GRAB.distance, 0, this.grabFacing, 0)
+          this.grabHit(target, GRAB_HITS.suplex, (-this.grabFacing) as Facing, world)
+          world.quake(4)
+        }
+        if (this.grabFrame >= GRAB.suplex.length) return this.endGrab()
+        break
+      case 'swing': {
+        const f = this.grabFrame
+        if (this.grabbed && f < GRAB.swing.releaseAt) {
+          // 轉的時候一直面向被甩的人
+          this.facing = (Math.cos(swingAngle(f)) >= 0 ? this.grabFacing : -this.grabFacing) as Facing
+          this.placeGrabbed()
+          if (f >= GRAB.swing.sweepFrom) this.swingSweep(world)
+        }
+        if (f === GRAB.swing.releaseAt && this.grabbed) {
+          this.facing = this.grabFacing
+          const target = this.grabbed
+          this.grabbed = null
+          target.holdAt(this.x + this.grabFacing * GRAB.swing.radius, GRAB.swing.height, (-this.grabFacing) as Facing, 0)
+          this.grabHit(target, GRAB_HITS.swingRelease, this.grabFacing, world)
+        }
+        if (f >= GRAB.swing.length) return this.endGrab()
+        break
+      }
+    }
+    this.placeGrabbed()
+  }
+
+  /** 依目前的抓技動作，把抓著的人擺到該在的位置。 */
+  private placeGrabbed(): void {
+    const g = this.grabbed
+    if (!g) return
+    const side = this.grabFacing
+    switch (this.grabMove) {
+      case 'suplex': {
+        // 從面前沿著頭頂的弧線舉到身後
+        const { liftFrom, slamAt, radius, height } = GRAB.suplex
+        const t = Math.min(1, Math.max(0, (this.grabFrame - liftFrom) / (slamAt - liftFrom)))
+        const a = Math.PI * t * t * (3 - 2 * t)
+        g.holdAt(this.x + side * Math.cos(a) * radius, Math.sin(a) * height, (-side) as Facing, side * a)
+        return
+      }
+      case 'swing': {
+        const a = swingAngle(this.grabFrame)
+        const { radius, height } = GRAB.swing
+        // 被甩的人身體打橫、頭朝外
+        const x = this.x + side * Math.cos(a) * radius
+        const out: Facing = x >= this.x ? 1 : -1
+        g.holdAt(x, height, (-out) as Facing, out * (Math.PI / 2))
+        return
+      }
+      case 'knee': {
+        const lifted = this.grabFrame >= GRAB.knee.hitAt && this.grabFrame < GRAB.knee.hitAt + 4
+        g.holdAt(this.x + this.facing * GRAB.distance, lifted ? 3 : 0, (-this.facing) as Facing, 0)
+        return
+      }
+      default:
+        g.holdAt(this.x + this.facing * GRAB.distance, 0, (-this.facing) as Facing, 0)
+    }
+  }
+
+  /** 大風車途中，被甩的人撞到的其他敵人倒地。 */
+  private swingSweep(world: World): void {
+    const g = this.grabbed!
+    const box = { x: g.x - 14, y: GROUND_Y - g.h - 34, w: 28, h: 34 }
+    for (const e of world.enemies) {
+      if (e === g || this.swingHits.has(e.id) || e.invuln > 0) continue
+      const hurt = e.hurtbox()
+      if (!hurt) continue
+      if (box.x > hurt.x + hurt.w || box.x + box.w < hurt.x || box.y > hurt.y + hurt.h || box.y + box.h < hurt.y) continue
+      this.swingHits.add(e.id)
+      this.grabHit(e, GRAB_HITS.swingSweep, e.x >= this.x ? 1 : -1, world)
+    }
+  }
+
+  private grabHit(target: Enemy, spec: HitSpec, dir: Facing, world: World): void {
+    world.landHit(this, target, spec, dir, target.x, GROUND_Y - target.h - 22)
+  }
+
   private poseKey(): string {
     if (this.state !== 'free') return this.state
     return this.airborne ? 'air' : this.crouching ? 'crouch' : this.walking ? 'walk' : 'idle'
@@ -503,6 +710,8 @@ export class Agent extends Fighter {
 
   private targetPose(): Pose {
     switch (this.state) {
+      case 'grab':
+        return GRAB_CLIPS[this.grabMove].sample(this.grabFrame)
       case 'action':
         return this.act!.def.clip.sample(this.act!.frame)
       case 'land':

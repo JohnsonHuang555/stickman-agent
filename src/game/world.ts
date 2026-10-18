@@ -2,7 +2,7 @@ import type { Sound } from '../audio/sfx'
 import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
 import { ComboCounter } from './combat/comboCounter'
-import { overlaps, type Box, type HitSpec, type Hitter } from './combat/types'
+import { overlaps, type HitSpec, type Hitter } from './combat/types'
 import { GROUND_Y, VIEW_W } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
 import { Boss } from './enemies/boss'
@@ -38,6 +38,8 @@ const BOSS_BANNER_FRAMES = 150
 const POPUP_FRAMES = 50
 /** 每次命中的基本分，乘上連擊倍率。 */
 const HIT_SCORE = 10
+/** 按 C 抓人時，敵人離特務最遠的距離。 */
+const GRAB_RANGE = 30
 const snapshot = (f: Fighter): FighterDisplay => ({ x: f.x, h: f.h, rotation: f.rotation, pose: f.pose() })
 /** 被打飛撞到牆時的額外傷害。 */
 const WALL_BOUNCE_DAMAGE = 6
@@ -494,14 +496,38 @@ export class World {
   }
 
   /** 命中的打擊演出：衝擊閃光、下砸／斷條時推近鏡頭、清場時慢動作。 */
-  private hitEffects(spec: HitSpec, box: Box, hurtbox: Box, target: Fighter, dir: Facing, wasAlive: boolean, barsBefore: number): void {
-    // 閃光畫在判定框和受擊框重疊的中心
-    const x0 = Math.max(box.x, hurtbox.x)
-    const x1 = Math.min(box.x + box.w, hurtbox.x + hurtbox.w)
-    const y0 = Math.max(box.y, hurtbox.y)
-    const y1 = Math.min(box.y + box.h, hurtbox.y + hurtbox.h)
-    const x = (x0 + x1) / 2
-    const y = (y0 + y1) / 2
+  /**
+   * 一次命中的所有後續：受擊、頓幀、音效、震動、連擊、得分與打擊演出。
+   * (x, y) 是衝擊閃光的位置。一般攻擊與抓技（膝撞、摔、大風車）共用。
+   */
+  landHit(attacker: Hitter, target: Fighter, spec: HitSpec, dir: Facing, x: number, y: number, hitsAllies = false): void {
+    const wasAlive = !target.life.isDead
+    const wasJuggled = target instanceof Grunt && target.juggled
+    const barsBefore = target.life.barsRemaining
+    target.receiveHit(spec, dir, this)
+    attacker.onHitLanded?.(this)
+    this.hitEffects(spec, x, y, target, dir, wasAlive, barsBefore)
+
+    // 空中追擊的輕擊頓幀較短，連段才流暢、敵人不會像定格在空中
+    this.hitstop = Math.max(this.hitstop, spec.heavy ? 7 : wasJuggled ? 2 : 4)
+    this.sound(target === this.agent ? 'hurt' : spec.heavy ? 'heavyHit' : 'hit')
+    if (spec.heavy || target === this.agent) this.shake = Math.max(this.shake, spec.heavy ? 4 : 2)
+
+    if (target === this.agent) this.combo.break()
+    if (target instanceof Enemy) {
+      this.focus = { target, until: this.realFrame + 180 }
+      if (attacker.team === 'agent') this.combo.hit(this.realFrame)
+      if (attacker.team === 'agent' || hitsAllies) {
+        this.score += HIT_SCORE * this.combo.multiplier
+        if (wasAlive && target.life.isDead) {
+          this.score += target.score
+          this.sound('ko')
+        }
+      }
+    }
+  }
+
+  private hitEffects(spec: HitSpec, x: number, y: number, target: Fighter, dir: Facing, wasAlive: boolean, barsBefore: number): void {
     const finishing = target instanceof Enemy && wasAlive && target.life.isDead && this.isFinishingBlow(target)
     const heavy = !!(spec.heavy || spec.knockdown || spec.launch) || finishing
     this.fx.spark(x, y, heavy, target === this.agent, dir, this.realFrame)
@@ -542,6 +568,18 @@ export class World {
       this.score += g.score
       this.sound('ko')
     }
+  }
+
+  /** 特務面前抓得住的雜兵（在硬直中、距離 GRAB_RANGE 內）；Boss 抓不住。 */
+  grabTarget(f: Fighter): Grunt | null {
+    let best: Grunt | null = null
+    for (const e of this.enemies) {
+      if (!(e instanceof Grunt) || !e.grabbable) continue
+      const ahead = (e.x - f.x) * f.facing
+      if (ahead < -4 || ahead > GRAB_RANGE) continue
+      if (!best || Math.abs(e.x - f.x) < Math.abs(best.x - f.x)) best = e
+    }
+    return best
   }
 
   /** 這個位置附近有沒有正在浮空的雜兵（決定空中連段輔助要不要啟用）。 */
@@ -603,30 +641,12 @@ export class World {
           !isFighter || hit.hitsAllies
             ? attacker.vx < 0 ? -1 : 1
             : target.x === attacker.x ? attacker.facing : target.x > attacker.x ? 1 : -1
-        const wasAlive = !target.life.isDead
-        const wasJuggled = target instanceof Grunt && target.juggled
-        const barsBefore = target.life.barsRemaining
-        target.receiveHit(hit.spec, dir, this)
-        attacker.onHitLanded?.(this)
-        this.hitEffects(hit.spec, hit.box, hurtbox, target, dir, wasAlive, barsBefore)
-
-        // 空中追擊的輕擊頓幀較短，連段才流暢、敵人不會像定格在空中
-        this.hitstop = Math.max(this.hitstop, hit.spec.heavy ? 7 : wasJuggled ? 2 : 4)
-        this.sound(target === this.agent ? 'hurt' : hit.spec.heavy ? 'heavyHit' : 'hit')
-        if (hit.spec.heavy || target === this.agent) this.shake = Math.max(this.shake, hit.spec.heavy ? 4 : 2)
-
-        if (target === this.agent) this.combo.break()
-        if (target instanceof Enemy) {
-          this.focus = { target, until: this.realFrame + 180 }
-          if (attacker.team === 'agent') this.combo.hit(this.realFrame)
-          if (attacker.team === 'agent' || hit.hitsAllies) {
-            this.score += HIT_SCORE * this.combo.multiplier
-            if (wasAlive && target.life.isDead) {
-              this.score += target.score
-              this.sound('ko')
-            }
-          }
-        }
+        // 閃光畫在判定框和受擊框重疊的中心
+        const x0 = Math.max(hit.box.x, hurtbox.x)
+        const x1 = Math.min(hit.box.x + hit.box.w, hurtbox.x + hurtbox.w)
+        const y0 = Math.max(hit.box.y, hurtbox.y)
+        const y1 = Math.min(hit.box.y + hit.box.h, hurtbox.y + hurtbox.h)
+        this.landHit(attacker, target, hit.spec, dir, (x0 + x1) / 2, (y0 + y1) / 2, !!hit.hitsAllies)
         // 子彈、碎掉或已命中的投擲物不再打中同一幀的其他人
         if (spent(attacker)) break
       }
