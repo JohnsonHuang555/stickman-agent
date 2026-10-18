@@ -465,9 +465,11 @@ export class Grunt extends Enemy {
     return this.vh > 0 ? JUGGLE_RISE_GRAVITY : JUGGLE_FALL_GRAVITY
   }
 
-  /** 抓得住：在地上、正在硬直中（被打中的那一下）。 */
+  /** 抓得住：站在地上的雜兵（走路、等待、出招、硬直中都可以）；浮空、倒地、起身中抓不到。 */
   get grabbable(): boolean {
-    return this.state === 'hurt' && !this.airborne && !this.life.isDead
+    const s = this.state
+    const standing = s === 'wait' || s === 'approach' || s === 'attack' || s === 'retreat' || s === 'fetch' || s === 'pickup' || s === 'hurt'
+    return standing && !this.airborne && !this.life.isDead
   }
 
   get isGrabbed(): boolean {

@@ -3,7 +3,7 @@ import { Clip } from '../stickman/clip'
 import { ATTACK_POSES } from '../stickman/poses'
 
 /**
- * 抓技（按 C 抓住硬直中的雜兵）：
+ * 抓技（空手、腳邊沒東西時，在雜兵面前按 C 抓住）：
  * - Z 膝撞，第三下撞倒
  * - X／→+X 往前摔，←+X（往後）過肩摔到身後
  * - 空白 大風車：原地轉兩圈掃倒旁邊的敵人，最後甩出去

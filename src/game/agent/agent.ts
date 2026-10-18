@@ -212,7 +212,7 @@ export class Agent extends Fighter {
         this.setState('pickup')
         return
       }
-      // 空手、腳邊沒東西：抓住面前硬直中的雜兵
+      // 空手、腳邊沒東西：抓住面前的雜兵
       const target = this.held ? null : world.grabTarget(this)
       if (target) {
         this.startGrab(target, world)
@@ -249,7 +249,7 @@ export class Agent extends Fighter {
       if (kind && this.tryJumpAttack(kind, now)) return
     }
 
-    // 拳腳打中後的收招可以按 C 直接抓住被打得硬直的敵人
+    // 拳腳打中後的收招可以按 C 直接抓住面前的敵人
     const spec = act.def.hit
     const grabReady = this.grabUntil >= now && now - this.grabAt >= SIMULTANEOUS_WINDOW
     if (grabReady && !this.held && !act.def.aerial && spec && act.frame > spec.to && act.hitIds.size > 0) {

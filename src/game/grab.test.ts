@@ -13,7 +13,7 @@ function run(world: World, frames: number, held: Button[] = []) {
   for (let i = 0; i < frames; i++) tick(world, [], held)
 }
 
-/** 特務面前一個雜兵；先打一拳讓它進入硬直，再按 C 抓住。 */
+/** 特務面前一個雜兵，直接按 C 抓住。 */
 function grabbed(gap = 16, type: 'thug' | 'heavy' = 'thug') {
   const world = new World({ mode: 'sandbox' })
   world.items = []
@@ -21,33 +21,65 @@ function grabbed(gap = 16, type: 'thug' | 'heavy' = 'thug') {
   const g = new Grunt(300 + gap, type, { passive: true })
   g.life.hp = 999
   world.enemies = [g]
-  tick(world, ['punch'])
-  run(world, 6)
   tick(world, ['grab'])
   run(world, SIMULTANEOUS_WINDOW + 1)
-  g.life.hp = 999 // 只算抓住之後的傷害
   return { world, g }
 }
 
 const lost = (g: Grunt) => 999 - g.life.hp
 
 describe('grabbing (C)', () => {
-  it('C grabs an enemy in hit-stun in front of you and holds it at arm’s length', () => {
+  it('C in front of an enemy grabs it (no need to hit it first) and holds it at arm’s length', () => {
     const { world, g } = grabbed()
     expect(g.isGrabbed).toBe(true)
     expect(g.x - world.agent.x).toBeCloseTo(GRAB.distance)
     expect(g.hurtbox()).toBeNull() // 被抓著時其他攻擊打不到
   })
 
-  it('an enemy that is not in hit-stun cannot be grabbed', () => {
+  it('an enemy that is mid-attack can be grabbed too (the grab cancels its attack)', () => {
     const world = new World({ mode: 'sandbox' })
     world.items = []
     world.agent.x = 300
-    const g = new Grunt(316, 'thug', { passive: true })
+    world.agent.life.hp = 9999 // 無敵的話雜兵不會出招，改成血很多
+    const g = new Grunt(318, 'thug', { moves: ['jab'] })
+    world.enemies = [g]
+    for (let i = 0; i < 1200 && !g.attacking; i++) tick(world)
+    expect(g.attacking).toBe(true)
+    // 站到雜兵面向的那一側，面對它
+    world.agent.x = g.x + g.facing * 16
+    world.agent.facing = g.facing === 1 ? -1 : 1
+    tick(world, ['grab'])
+    run(world, SIMULTANEOUS_WINDOW + 1)
+    expect(g.isGrabbed).toBe(true)
+    expect(g.attacking).toBe(false)
+  })
+
+  it.each([
+    ['too far away', 60],
+    ['behind you', -16],
+  ] as const)('cannot grab an enemy that is %s', (_n, gap) => {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    const g = new Grunt(300 + gap, 'thug', { passive: true })
     world.enemies = [g]
     tick(world, ['grab'])
     run(world, 10)
     expect(g.isGrabbed).toBe(false)
+  })
+
+  it('cannot grab an enemy that is knocked down or in the air', () => {
+    const world = new World({ mode: 'sandbox' })
+    world.items = []
+    world.agent.x = 300
+    const g = new Grunt(316, 'thug', { passive: true })
+    g.life.hp = 999
+    world.enemies = [g]
+    g.receiveHit({ ...GRAB_HITS.throw, knockback: 0.1 }, 1, world)
+    for (let i = 0; i < 60; i++) {
+      tick(world, i === 0 || i === 30 ? ['grab'] : [])
+      expect(g.isGrabbed).toBe(false)
+    }
   })
 
   it('bosses cannot be grabbed', () => {
@@ -206,6 +238,6 @@ describe('grab moves', () => {
     tick(world, ['punch'])
     run(world, GRAB.knee.length + 2)
     expect(world.score).toBeGreaterThan(score0)
-    expect(world.combo.count).toBeGreaterThanOrEqual(2)
+    expect(world.combo.count).toBeGreaterThanOrEqual(1)
   })
 })

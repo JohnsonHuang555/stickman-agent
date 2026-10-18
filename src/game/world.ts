@@ -570,7 +570,7 @@ export class World {
     }
   }
 
-  /** 特務面前抓得住的雜兵（在硬直中、距離 GRAB_RANGE 內）；Boss 抓不住。 */
+  /** 特務面前抓得住的雜兵（站在地上、距離 GRAB_RANGE 內）；Boss 抓不住。 */
   grabTarget(f: Fighter): Grunt | null {
     let best: Grunt | null = null
     for (const e of this.enemies) {
