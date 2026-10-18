@@ -2,3 +2,6 @@ node_modules
 dist
 .vercel
 *.local
+
+# 本機環境變數（含 Firebase 設定），不要推上 GitHub
+.env
