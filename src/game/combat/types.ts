@@ -42,6 +42,8 @@ export interface HitSpec {
   grab?: boolean
   /** 抓著對方時的攻擊（膝撞）：被抓的人吃傷害但不會被打離手上。 */
   holdHit?: boolean
+  /** 閃身步閃過攻擊後的反擊：打中時結束慢動作、鏡頭推近。 */
+  counter?: boolean
 }
 
 /** 這一幀正在生效的攻擊判定。 */

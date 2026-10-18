@@ -53,6 +53,10 @@ const JUMP_BUFFER = 8
 const LAND_FRAMES = 4
 /** 大風車的「前、後、前」要在按 K 之前這麼多幀內輸入完（約 0.6 秒）。 */
 const SWING_INPUT_WINDOW = 36
+/** 反擊：前幾幀衝刺、最快速度、停在離目標多遠。 */
+const COUNTER_DASH_FRAMES = 4
+const COUNTER_DASH_SPEED = 12
+const COUNTER_STOP_DISTANCE = 14
 /** 掙脫雜兵的抓取後無敵幾幀。 */
 const ESCAPE_INVULN = 30
 /** 換姿勢時的補間幀數。 */
@@ -120,6 +124,9 @@ export class Agent extends Fighter {
   private grabAt = -1
   private bagUntil = -1
   private crouching = false
+  /** 閃身步閃過攻擊後：反擊的目標與時限（實際幀）。 */
+  private counterTarget: Fighter | null = null
+  private counterUntil = -1
   /** 最近的按鍵紀錄（判斷大風車的「前後前」）。 */
   private recentPresses: readonly Press[] = []
   /** 被雜兵抓住時：抓我的人、已經狂按了幾下、最後一次按的幀（掙扎動畫用）。 */
@@ -272,9 +279,11 @@ export class Agent extends Fighter {
   }
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
+    if (this.tryCounter(cmd, now)) return
     // Left Shift：閃身步（按著面向的方向往前閃，其他往後閃；面向不變）
     if (this.dodgeUntil >= now && !this.airborne && !this.carryingHeavy) {
       this.dodgeUntil = -1
+      this.dodgeOrigin = this.hurtbox()
       this.startAction(this.heldDir() === this.facing ? MOVES.dodgeForward : MOVES.dodgeBack)
       return
     }
@@ -346,6 +355,10 @@ export class Agent extends Fighter {
   private updateAction(cmd: Command | null, now: number, world: World): void {
     const act = this.act!
     act.frame++
+
+    // 閃身步途中（或收招時）按攻擊：直接反擊
+    if (act.def !== MOVES.counter && this.tryCounter(cmd, now)) return
+    if (act.def === MOVES.counter) this.counterDash(act.frame)
 
     // 先按攻擊、緊接著按跳：地面招式才剛起手就取消，改成起跳後的空中招式
     if (act.frame <= JUMP_ATTACK_WINDOW) {
@@ -597,6 +610,26 @@ export class Agent extends Fighter {
     return this.state === 'down' && this.life.isDead && this.stateFrame > 60
   }
 
+  /** 正在閃身步。 */
+  get isDodging(): boolean {
+    const def = this.act?.def
+    return this.state === 'action' && (def === MOVES.dodgeBack || def === MOVES.dodgeForward)
+  }
+
+  /** 閃身步開始時站的位置（受擊框）：攻擊在閃身步途中打到這裡，也算閃過（往後閃會很快離開攻擊範圍）。 */
+  dodgeOrigin: Box | null = null
+
+  /** 閃身步閃過 enemy 的攻擊：until 之前按 J／K 就反擊它。 */
+  openCounter(enemy: Fighter, until: number): void {
+    this.counterTarget = enemy
+    this.counterUntil = until
+  }
+
+  /** 現在是不是反擊的時機（HUD 顯示提示用）。 */
+  counterReady(frame: number): boolean {
+    return this.counterUntil >= frame && !!this.counterTarget
+  }
+
   /** 正被雜兵抓著。 */
   get isHeld(): boolean {
     return this.state === 'held'
@@ -708,6 +741,31 @@ export class Agent extends Fighter {
     this.grabMove = move
     this.grabFrame = 0
     this.grabFacing = this.facing
+  }
+
+  /** 反擊時機內按了攻擊鍵：衝向剛才攻擊的敵人重擊。 */
+  private tryCounter(cmd: Command | null, now: number): boolean {
+    const target = this.counterTarget
+    if (!cmd || this.counterUntil < now || !target || this.airborne) return false
+    const attack = ['punch', 'kick', 'launcher', 'dashPunch', 'crouchPunch', 'sweep', 'groinKick', 'runKick'].includes(cmd.kind)
+    if (!attack) return false
+    this.buffered = null
+    this.counterUntil = -1
+    this.facing = target.x >= this.x ? 1 : -1
+    this.startAction(MOVES.counter)
+    this.invuln = MOVES.counter.length
+    return true
+  }
+
+  /** 反擊前幾幀快速衝到目標面前。 */
+  private counterDash(frame: number): void {
+    const target = this.counterTarget
+    if (!target || frame > COUNTER_DASH_FRAMES) {
+      this.vx = 0
+      return
+    }
+    const gap = (target.x - this.x) * this.facing - COUNTER_STOP_DISTANCE
+    this.vx = this.facing * Math.max(0, Math.min(COUNTER_DASH_SPEED, gap / (COUNTER_DASH_FRAMES - frame + 1)))
   }
 
   /** 抓著時最近 SWING_INPUT_WINDOW 幀內，方向鍵依序按了「前、後、前」（大風車的指令）。 */

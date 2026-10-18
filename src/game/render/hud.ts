@@ -184,6 +184,20 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
   }
 
   // 由外層（App）畫暫停設定面板時就不畫這個簡單的暫停畫面
+  if (world.agent.counterReady(world.realFrame)) {
+    // 四周暗角，中間留亮
+    const g = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.6)
+    g.addColorStop(0, 'rgba(10,20,40,0)')
+    g.addColorStop(1, 'rgba(10,20,40,0.55)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+    // 字從大縮到正常大小（不閃爍）
+    const age = world.realFrame - world.counterAt
+    const size = Math.round(16 + Math.max(0, 8 - age) * 1.5)
+    text(ctx, 'COUNTER!', VIEW_W / 2, 66, size, 'center')
+    text(ctx, 'J / K', VIEW_W / 2, 66 + size + 6, 8, 'center')
+  }
+
   if (world.paused && world.pauseOverlay) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)

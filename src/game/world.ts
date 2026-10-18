@@ -49,6 +49,8 @@ const MUZZLE_FRAMES = 5
 /** 打倒區段最後一個敵人／魔王：慢動作長度（實際幀數）與速度（每幾幀推進一次）。 */
 const FINISH_SLOWMO_FRAMES = 60
 const SLOWMO_RATE = 3
+/** 閃身步閃過攻擊後：慢動作與可以反擊的時間（實際幀，約 1 秒）。 */
+const COUNTER_WINDOW = 60
 /** 自動撿起醫療箱、分數道具的距離。 */
 const CONSUME_REACH = 12
 
@@ -144,6 +146,8 @@ export class World {
   readonly fx = new ImpactFx()
   /** 剩下幾個實際幀的慢動作。 */
   slowmo = 0
+  /** 最近一次閃身步閃過攻擊的實際幀（HUD 的提示動畫用）。 */
+  counterAt = -999
   /** 慢動作中上一次模擬推進前的畫面狀態，與推進的實際幀；畫面在兩者之間補間，動作才不會一頓一頓。 */
   private slowPrev: { at: number; camX: number; fighters: Map<Fighter, FighterDisplay> } | null = null
   private readonly buffer = new InputBuffer()
@@ -547,6 +551,11 @@ export class World {
     this.fx.spark(x, y, heavy, target === this.agent, dir, this.realFrame)
 
     if (!(target instanceof Enemy)) return
+    if (spec.counter) {
+      // 反擊打中：慢動作結束、鏡頭推近
+      this.slowmo = 0
+      this.fx.pushIn(x, y, 0.18, 10, this.realFrame)
+    }
     if (finishing) {
       this.slowmo = FINISH_SLOWMO_FRAMES
       this.fx.whiteFlash(8, this.realFrame)
@@ -556,6 +565,15 @@ export class World {
     } else if (target instanceof Boss && target.life.barsRemaining < barsBefore) {
       this.fx.pushIn(x, y, 0.14, 12, this.realFrame)
     }
+  }
+
+  /** 閃身步閃過攻擊：慢動作，期間按 J／K 反擊。 */
+  private perfectDodge(enemy: Enemy): void {
+    if (this.agent.counterReady(this.realFrame)) return
+    this.agent.openCounter(enemy, this.realFrame + COUNTER_WINDOW)
+    this.slowmo = Math.max(this.slowmo, COUNTER_WINDOW)
+    this.counterAt = this.realFrame
+    this.sound('select')
   }
 
   /** 打倒的是魔王，或區段最後一波的最後一個敵人。 */
@@ -647,10 +665,20 @@ export class World {
       const hit = attacker.activeHit()
       if (!hit) continue
       for (const target of fighters) {
-        if (target === attacker || target.invuln > 0 || hit.hitIds.has(target.id)) continue
+        if (target === attacker || hit.hitIds.has(target.id)) continue
         if ((target.team === attacker.team) !== !!hit.hitsAllies) continue
         const hurtbox = target.hurtbox()
+        // 閃身步途中：攻擊打到現在的位置、或打到閃之前站的位置，都算閃過 → 慢動作，給特務反擊的機會
+        if (target === this.agent && target.invuln > 0 && this.agent.isDodging && attacker instanceof Enemy) {
+          const origin = this.agent.dodgeOrigin
+          if ((hurtbox && overlaps(hit.box, hurtbox)) || (origin && overlaps(hit.box, origin))) {
+            hit.hitIds.add(target.id)
+            this.perfectDodge(attacker)
+          }
+          continue
+        }
         if (!hurtbox || !overlaps(hit.box, hurtbox)) continue
+        if (target.invuln > 0) continue
 
         hit.hitIds.add(target.id)
         const isFighter = fighters.includes(attacker as Fighter)

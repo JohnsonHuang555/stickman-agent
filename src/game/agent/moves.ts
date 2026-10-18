@@ -221,6 +221,22 @@ export const MOVES = {
       f.vh = RUN_KICK_HOP
     },
   },
+  /** 閃身步閃過敵人攻擊後按 J／K：衝向攻擊者重擊（衝刺的移動由特務依目標位置控制）。 */
+  counter: {
+    clip: attackClip(ATTACK_POSES.dashPunch, 4, 6, 14),
+    length: 24,
+    hit: {
+      from: 4,
+      to: 9,
+      box: { forward: 2, up: 14, w: 30, h: 28 },
+      damage: 20,
+      hitstun: 24,
+      knockback: 4,
+      knockdown: true,
+      heavy: true,
+      counter: true,
+    },
+  },
   /** 快速連按兩下 X：往前上方踢下體。傷害小，但雜兵會摀著下體彎腰很久。 */
   groinKick: {
     clip: attackClip(ATTACK_POSES.groinKick, 3, 4, 12),

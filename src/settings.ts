@@ -56,7 +56,7 @@ export const CONTROL_GROUPS: readonly { title: string; items: readonly [keys: st
       ['A D 連按兩下', '跑步（按住）'],
       ['W', '跳（貼牆再按：蹬牆跳）'],
       ['S', '蹲下'],
-      ['Shift', '閃身步（無敵）'],
+      ['Shift', '閃身步（閃過攻擊 → J／K 反擊）'],
       ['J', '拳（連按三段拳）'],
       ['K', '踢'],
       ['L', '撿／丟；空手時抓住敵人'],
