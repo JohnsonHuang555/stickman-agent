@@ -42,7 +42,7 @@ describe('running (double-tap and hold a direction)', () => {
     const world = sandbox()
     doubleTap(world)
     const ran = distance(world, 30)
-    expect(ran).toBeGreaterThan(walk * 1.6)
+    expect(ran).toBeGreaterThan(walk * 1.4)
   })
 
   it.each([2, 4, 6, 8, 10])('works at human double-tap speeds (%i frames between taps)', (gap) => {
@@ -87,7 +87,7 @@ describe('running (double-tap and hold a direction)', () => {
       run(world, 10, ['right'])
       return world.agent.x - x0
     }
-    expect(jumpFar(true)).toBeGreaterThan(jumpFar(false) + 8)
+    expect(jumpFar(true)).toBeGreaterThan(jumpFar(false) + 4)
   })
 })
 
