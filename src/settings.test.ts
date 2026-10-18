@@ -36,7 +36,7 @@ describe('settings storage', () => {
 
   it('the controls list covers the moves that used to be in the footer, plus the newer ones', () => {
     const all = CONTROL_GROUPS.flatMap((g) => g.items.map(([keys, action]) => `${keys} ${action}`)).join('\n')
-    for (const word of ['移動', '拳', '踢', '跳', '撿', '背包', '挑空', '下砸', '飛踢', '翻滾', '保命招', '衝刺拳', '暫停', '跑步', '踢下體', '大風車', '過肩摔']) {
+    for (const word of ['移動', '拳', '踢', '跳', '撿', '背包', '挑空', '下砸', '飛踢', '閃身步', '保命招', '衝刺拳', '暫停', '跑步', '踢下體', '大風車', '過肩摔', '掙脫']) {
       expect(all).toContain(word)
     }
   })

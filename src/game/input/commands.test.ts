@@ -7,14 +7,14 @@ const press = (button: Button, frame: number): Press => ({ button, frame })
 function recognize(
   presses: Press[],
   frame: number,
-  opts: { airborne?: boolean; crouching?: boolean; up?: boolean; down?: boolean; held?: Button[] } = {},
+  opts: { airborne?: boolean; crouching?: boolean; launchReady?: boolean; down?: boolean; held?: Button[] } = {},
 ) {
   return recognizeCommand({
     frame,
     presses,
     airborne: opts.airborne ?? false,
     crouching: opts.crouching ?? false,
-    up: opts.up,
+    launchReady: opts.launchReady,
     down: opts.down,
     held: opts.held && new Set(opts.held),
   })
@@ -72,13 +72,13 @@ describe('recognizeCommand', () => {
     expect(recognize([press('punch', 10)], 10, { airborne: true, down: true })?.kind).toBe('diveSmash')
   })
 
-  it('up + z on the ground is the launcher', () => {
-    expect(recognize([press('punch', 10)], 10, { up: true })?.kind).toBe('launcher')
+  it('punch right after down → up (S → W) on the ground is the launcher', () => {
+    expect(recognize([press('punch', 10)], 10, { launchReady: true })?.kind).toBe('launcher')
   })
 
-  it('up + z + x + c is still the desperation move', () => {
+  it('the desperation move still wins right after down → up', () => {
     const presses = [press('punch', 10), press('kick', 10), press('grab', 10)]
-    expect(recognize(presses, 10, { up: true })?.kind).toBe('desperation')
+    expect(recognize(presses, 10, { launchReady: true })?.kind).toBe('desperation')
   })
 
   it('no desperation move in the air', () => {

@@ -38,6 +38,10 @@ export interface HitSpec {
   spike?: boolean
   /** 踢到下體：雜兵摀著下體彎腰硬直（Boss 不受影響）。 */
   groin?: boolean
+  /** 抓住對方（不造成傷害）：特務被雜兵抓住，要狂按按鍵才能掙脫。 */
+  grab?: boolean
+  /** 抓著對方時的攻擊（膝撞）：被抓的人吃傷害但不會被打離手上。 */
+  holdHit?: boolean
 }
 
 /** 這一幀正在生效的攻擊判定。 */

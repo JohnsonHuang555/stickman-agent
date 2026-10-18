@@ -43,7 +43,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, cursor: number, nicknam
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('↑↓ 選擇   Z / ENTER 確定', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText('W S 選擇   J / ENTER 確定', VIEW_W / 2, VIEW_H - 6)
 }
 
 export function drawLeaderboard(
@@ -85,7 +85,7 @@ export function drawLeaderboard(
   ctx.font = '7px monospace'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText('Z / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText('J / ENTER / ESC 返回', VIEW_W / 2, VIEW_H - 6)
 }
 
 /**
@@ -113,7 +113,7 @@ export function drawSettings(
     ['SFX', settings.sfx],
     [overlay ? 'RESUME' : 'BACK', null],
   ]
-  if (overlay) rows.push([quitArmed ? 'QUIT TO TITLE?  PRESS Z AGAIN' : 'QUIT TO TITLE', null])
+  if (overlay) rows.push([quitArmed ? 'QUIT TO TITLE?  PRESS J AGAIN' : 'QUIT TO TITLE', null])
   const rowGap = overlay ? 14 : 16
   rows.forEach(([label, value], i) => {
     const y = 32 + i * rowGap
@@ -155,5 +155,5 @@ export function drawSettings(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  ctx.fillText(overlay ? '↑↓ 選擇   ←→ 調整音量   P／ESC 繼續遊戲' : '↑↓ 選擇   ←→ 調整音量   ESC 返回', VIEW_W / 2, VIEW_H - 6)
+  ctx.fillText(overlay ? 'W S 選擇   A D 調整音量   J 確定   P／ESC 繼續遊戲' : 'W S 選擇   A D 調整音量   J 確定   ESC 返回', VIEW_W / 2, VIEW_H - 6)
 }

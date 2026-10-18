@@ -1,8 +1,17 @@
 import type { ActionDef, ActionInstance, ActiveHit, Box, HitSpec } from '../combat/types'
 import { GROUND_Y } from '../constants'
 import { Fighter } from '../fighter'
-import type { Button, InputBuffer, InputSnapshot } from '../input/buttons'
-import { SIMULTANEOUS_WINDOW, doubleTapDirection, recognizeCommand, type Command, type CommandKind, type Facing } from '../input/commands'
+import type { Button, InputBuffer, InputSnapshot, Press } from '../input/buttons'
+import {
+  LAUNCH_INPUT_WINDOW,
+  LAUNCH_WAIT,
+  SIMULTANEOUS_WINDOW,
+  doubleTapDirection,
+  recognizeCommand,
+  type Command,
+  type CommandKind,
+  type Facing,
+} from '../input/commands'
 import { itemAction, throwActionFor } from '../items/itemActions'
 import { categoryOf } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
@@ -13,6 +22,7 @@ import { GRAB, GRAB_CLIPS, GRAB_HITS, swingAngle, type GrabMove } from './grab'
 import { MOVES, type MoveId } from './moves'
 import type { Enemy } from '../enemies/enemy'
 import type { Grunt } from '../enemies/grunt'
+import { ENEMY_HOLD } from '../enemies/enemyMoves'
 
 const WALK_SPEED = 2.1
 /** 連按兩下方向鍵（第二下按住）就跑步。 */
@@ -41,10 +51,14 @@ const WALL_JUMP_VELOCITY = 6.2
 const COMMAND_BUFFER = 10
 const JUMP_BUFFER = 8
 const LAND_FRAMES = 4
+/** 大風車的「前、後、前」要在按 K 之前這麼多幀內輸入完（約 0.6 秒）。 */
+const SWING_INPUT_WINDOW = 36
+/** 掙脫雜兵的抓取後無敵幾幀。 */
+const ESCAPE_INVULN = 30
 /** 換姿勢時的補間幀數。 */
 const POSE_BLEND = 6
 /** 換到這些姿勢不補間：出招、被打要立刻看得出來。 */
-const SNAP_POSES = new Set(['action', 'hurt', 'groin', 'launched', 'down'])
+const SNAP_POSES = new Set(['action', 'hurt', 'groin', 'held', 'launched', 'down'])
 /** 垂直速度在 ±這個值之間時，從上升姿勢轉成下落姿勢（約 11 幀）。 */
 const APEX_BLEND_SPEED = 2
 const DOWN_FRAMES = 40
@@ -75,7 +89,7 @@ const MOVE_FOR: Record<CommandKind, MoveId> = {
   groinKick: 'groinKick',
 }
 
-type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'groin' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
+type AgentState = 'free' | 'action' | 'land' | 'hurt' | 'groin' | 'held' | 'launched' | 'down' | 'getup' | 'pickup' | 'grab'
 
 export class Agent extends Fighter {
   readonly team = 'agent' as const
@@ -106,6 +120,16 @@ export class Agent extends Fighter {
   private grabAt = -1
   private bagUntil = -1
   private crouching = false
+  /** 最近的按鍵紀錄（判斷大風車的「前後前」）。 */
+  private recentPresses: readonly Press[] = []
+  /** 被雜兵抓住時：抓我的人、已經狂按了幾下、最後一次按的幀（掙扎動畫用）。 */
+  heldBy: Grunt | null = null
+  private escapePresses = 0
+  private lastStruggle = -99
+  /** 按下閃身步（Left Shift）的緩衝。 */
+  private dodgeUntil = -1
+  /** 「↓ 再 ↑」之後先不跳：在這一幀之前接拳就是挑空技，否則到時才起跳。 */
+  private launchReadyUntil = -1
   /** 正在跑步的方向（0 = 沒在跑）。 */
   private running: Facing | 0 = 0
   /** 這次跑了幾幀（加速用）與跑步循環的相位。 */
@@ -130,12 +154,13 @@ export class Agent extends Fighter {
   /** 每個實際幀都呼叫（包含頓幀期間），只負責收集輸入。 */
   readInput(snapshot: InputSnapshot, buffer: InputBuffer, realFrame: number): void {
     this.buttons = snapshot.held
+    this.recentPresses = buffer.presses
     const cmd = recognizeCommand({
       frame: realFrame,
       presses: buffer.presses,
       airborne: this.airborne,
       crouching: this.buttons.has('down') && !this.airborne,
-      up: this.buttons.has('up'),
+      launchReady: this.launchReadyUntil >= realFrame,
       down: this.buttons.has('down'),
       held: this.buttons,
       running: this.state === 'free' && !this.airborne ? this.running : 0,
@@ -146,7 +171,20 @@ export class Agent extends Fighter {
     if (tapped && doubleTapDirection(buffer.presses, realFrame) === tapped) {
       this.runRequest = { dir: tapped, until: realFrame + RUN_START_WINDOW }
     }
-    if (snapshot.pressed.includes('jump')) this.jumpUntil = realFrame + JUMP_BUFFER
+    // 跳：W／↑（測試用的 'jump' 也算）。剛按過 ↓ 再按 ↑ 時先等一下，看是不是要出挑空技
+    const upNow = snapshot.pressed.includes('up') || snapshot.pressed.includes('jump')
+    const downBefore = buffer.presses.some((p) => p.button === 'down' && p.frame < realFrame && realFrame - p.frame <= LAUNCH_INPUT_WINDOW)
+    if (upNow && snapshot.pressed.includes('up') && downBefore && !this.airborne) {
+      this.launchReadyUntil = realFrame + LAUNCH_WAIT
+    } else if (upNow) {
+      this.jumpUntil = realFrame + JUMP_BUFFER
+    }
+    if (cmd?.kind === 'launcher') this.launchReadyUntil = -1
+    else if (this.launchReadyUntil === realFrame) {
+      // 等完了還沒接拳：照常起跳
+      this.launchReadyUntil = -1
+      this.jumpUntil = realFrame + JUMP_BUFFER
+    }
     if (snapshot.pressed.includes('grab')) {
       this.grabUntil = realFrame + COMMAND_BUFFER
       this.grabAt = realFrame
@@ -154,6 +192,19 @@ export class Agent extends Fighter {
     // 保命招用到 C：取消這次的撿丟
     if (cmd?.kind === 'desperation') this.grabUntil = -1
     if (snapshot.pressed.includes('bag')) this.bagUntil = realFrame + COMMAND_BUFFER
+    if (snapshot.pressed.includes('dodge')) this.dodgeUntil = realFrame + COMMAND_BUFFER
+    // 被抓住時：每按一下攻擊鍵或方向鍵都算掙扎一次
+    if (this.state === 'held') {
+      const mash = snapshot.pressed.filter((b) => b !== 'pause' && b !== 'debug' && b !== 'confirm').length
+      if (mash) {
+        this.escapePresses += mash
+        this.lastStruggle = realFrame
+      }
+      this.buffered = null
+      this.jumpUntil = -1
+      this.dodgeUntil = -1
+      this.grabUntil = -1
+    }
   }
 
   update(world: World): void {
@@ -187,6 +238,20 @@ export class Agent extends Fighter {
         this.vx *= 0.82
         if (this.stateFrame >= this.hitstun) this.setState('free')
         break
+      case 'held':
+        this.vx = 0
+        if (!this.heldBy || !this.heldBy.holding) {
+          this.heldBy = null
+          this.setState('free')
+        } else if (this.escapePresses >= ENEMY_HOLD.escapePresses) {
+          // 掙脫：把抓我的人推開，自己短暫無敵
+          const holder = this.heldBy
+          this.heldBy = null
+          holder.shovedOff((holder.x >= this.x ? 1 : -1) as Facing)
+          this.invuln = ESCAPE_INVULN
+          this.setState('free')
+        }
+        break
       case 'down':
         this.vx *= 0.8
         if (this.stateFrame >= DOWN_FRAMES && !this.life.isDead) this.setState('getup')
@@ -202,12 +267,17 @@ export class Agent extends Fighter {
     }
 
     if (this.applyPhysics(world)) this.onLand()
-    // 只有翻滾時身體會旋轉；被打斷或做別的動作時立刻轉正
-    if (this.state !== 'action' || this.act?.def !== MOVES.roll) this.rotation = 0
+    this.rotation = 0
     this.trackPoseBlend()
   }
 
   private updateFree(cmd: Command | null, now: number, world: World): void {
+    // Left Shift：閃身步（按著面向的方向往前閃，其他往後閃；面向不變）
+    if (this.dodgeUntil >= now && !this.airborne && !this.carryingHeavy) {
+      this.dodgeUntil = -1
+      this.startAction(this.heldDir() === this.facing ? MOVES.dodgeForward : MOVES.dodgeBack)
+      return
+    }
     if (cmd && this.tryJumpAttack(cmd.kind, now)) return
     if (cmd && this.tryStart(cmd)) return
     // V：背包（收槍／掏槍／用醫療箱），空中也可以用
@@ -247,13 +317,7 @@ export class Agent extends Fighter {
     const dir = this.heldDir()
     if (this.jumpUntil >= now && !this.carryingHeavy) {
       this.jumpUntil = -1
-      // ↓+空白：翻滾（往按著的方向，沒按就往面對的方向）
-      if (this.buttons.has('down')) {
-        if (dir) this.facing = dir
-        this.startAction(MOVES.roll)
-      } else {
-        this.startJump(dir)
-      }
+      this.startJump(dir)
       return
     }
 
@@ -533,10 +597,15 @@ export class Agent extends Fighter {
     return this.state === 'down' && this.life.isDead && this.stateFrame > 60
   }
 
-  /** 正在做低姿勢的動作（蹲拳、掃腿、翻滾）：受擊框維持蹲姿高度。 */
+  /** 正被雜兵抓著。 */
+  get isHeld(): boolean {
+    return this.state === 'held'
+  }
+
+  /** 正在做低姿勢的動作（蹲拳、掃腿）：受擊框維持蹲姿高度。 */
   private get lowAction(): boolean {
     const def = this.act?.def
-    return this.state === 'action' && (def === MOVES.crouchPunch || def === MOVES.sweep || def === MOVES.roll)
+    return this.state === 'action' && (def === MOVES.crouchPunch || def === MOVES.sweep)
   }
 
   hurtbox(): Box | null {
@@ -554,6 +623,25 @@ export class Agent extends Fighter {
   }
 
   receiveHit(spec: HitSpec, dir: Facing, world: World): void {
+    // 被抓：空中、倒地、起身中抓不到
+    if (spec.grab) {
+      if (this.airborne || this.state === 'down' || this.state === 'getup' || this.state === 'launched' || this.state === 'held') return
+      this.releaseGrab()
+      this.act = null
+      this.crouching = false
+      this.running = 0
+      this.vx = 0
+      this.escapePresses = 0
+      this.setState('held')
+      return
+    }
+    // 抓著我的人膝撞：吃傷害但還被抓著
+    if (spec.holdHit && this.state === 'held' && !this.life.isDead) {
+      this.life.damage(spec.damage)
+      this.flash = 4
+      if (!this.life.isDead) return
+    }
+    this.heldBy = null
     this.releaseGrab()
     this.life.damage(spec.damage)
     this.flash = 4
@@ -622,6 +710,14 @@ export class Agent extends Fighter {
     this.grabFacing = this.facing
   }
 
+  /** 抓著時最近 SWING_INPUT_WINDOW 幀內，方向鍵依序按了「前、後、前」（大風車的指令）。 */
+  private swingInputDone(now: number): boolean {
+    const dirs = this.recentPresses
+      .filter((p) => (p.button === 'left' || p.button === 'right') && now - p.frame <= SWING_INPUT_WINDOW)
+      .map((p) => ((p.button === 'right' ? 1 : -1) === this.facing ? 'f' : 'b'))
+    return dirs.slice(-3).join('') === 'fbf'
+  }
+
   /** 放開抓著的人（被打、抓太久）。 */
   private releaseGrab(): void {
     if (this.grabbed) {
@@ -651,16 +747,19 @@ export class Agent extends Fighter {
         if (kind === 'punch' || kind === 'launcher' || kind === 'dashPunch' || kind === 'crouchPunch') {
           this.buffered = null
           this.setGrabMove('knee')
-        } else if (kind === 'kick' || kind === 'sweep') {
+        } else if (kind === 'kick' || kind === 'sweep' || kind === 'groinKick') {
           this.buffered = null
-          const back = this.heldDir() === -this.facing
-          this.setGrabMove(back ? 'suplex' : 'throw')
-          if (back) this.invuln = GRAB.suplex.length
-        } else if (this.jumpUntil >= now) {
-          this.jumpUntil = -1
-          this.swingHits = new Set()
-          this.setGrabMove('swing')
-          this.invuln = GRAB.swing.length
+          if (this.swingInputDone(now)) {
+            // 前 → 後 → 前 + K：大風車
+            this.swingHits = new Set()
+            this.setGrabMove('swing')
+            this.invuln = GRAB.swing.length
+          } else if (this.heldDir() === -this.facing) {
+            this.setGrabMove('suplex')
+            this.invuln = GRAB.suplex.length
+          } else {
+            this.setGrabMove('throw')
+          }
         }
         break
       }
@@ -896,6 +995,9 @@ export class Agent extends Fighter {
         return CLIPS.pickup.sample(0)
       case 'hurt':
         return CLIPS.hurt.sample(0)
+      case 'held':
+        // 被抓住：狂按時左右掙扎
+        return this.animFrame - this.lastStruggle < 6 && this.animFrame % 4 < 2 ? POSES.groinB : CLIPS.hurt.sample(0)
       case 'groin':
         return CLIPS.groin.sample(this.stateFrame)
       case 'launched':

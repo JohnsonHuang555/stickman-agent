@@ -36,7 +36,7 @@ export const ENEMY_TYPES: Readonly<Record<EnemyType, EnemyTypeDef>> = {
   },
   bruiser: {
     label: 'BRUISER', hue: 215, sat: 60, light: 50, hp: 60, score: 150, scale: 1,
-    walkSpeed: 1.2, cooldown: [45, 90], hoverDistance: 65, moves: ['jab', 'kick', 'kick', 'groinKick'],
+    walkSpeed: 1.2, cooldown: [45, 90], hoverDistance: 65, moves: ['jab', 'kick', 'kick', 'groinKick', 'grab'],
     loadout: () => (Math.random() < 0.7 ? newItem(pick(['bat', 'crowbar'] as const)) : null), pickups: ['melee'],
   },
   knifer: {
@@ -51,7 +51,7 @@ export const ENEMY_TYPES: Readonly<Record<EnemyType, EnemyTypeDef>> = {
   },
   heavy: {
     label: 'HEAVY', hue: 28, sat: 85, light: 52, hp: 100, score: 300, scale: 1.2,
-    walkSpeed: 0.9, cooldown: [70, 120], hoverDistance: 60, moves: ['slam', 'jab'],
+    walkSpeed: 0.9, cooldown: [70, 120], hoverDistance: 60, moves: ['slam', 'jab', 'grab'],
     loadout: () => null, pickups: ['throwable'],
   },
 }

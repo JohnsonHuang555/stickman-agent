@@ -1,13 +1,28 @@
 import type { ActionDef } from '../combat/types'
 import type { Fighter } from '../fighter'
-import { Clip, still } from '../stickman/clip'
+import { Clip } from '../stickman/clip'
+import type { Pose } from '../stickman/pose'
 import { ATTACK_POSES, POSES, aerialClip, attackClip } from '../stickman/poses'
 
 const DESPERATION_COST = 8
-/** 翻滾：持續幀數、無敵幀數、初速（約滾 60px）。 */
-const ROLL_FRAMES = 18
-const ROLL_INVULN = 16
-const ROLL_SPEED = 4.6
+/** 閃身步：持續幀數、無敵的幀數、初速（約滑 45px）。 */
+const DODGE_FRAMES = 14
+const DODGE_INVULN = 12
+const DODGE_SPEED = 5.6
+
+/** 閃身步：往 dir（1 = 面向的方向、-1 = 身後）快速滑開，面向不變，途中短暫無敵。 */
+function dodge(poses: readonly [Pose, Pose], dir: 1 | -1) {
+  return {
+    clip: attackClip(poses, 2, 8, DODGE_FRAMES - 10 + 6, POSES.idleA, 3),
+    length: DODGE_FRAMES + 6,
+    onStart: (f: Fighter) => {
+      f.invuln = DODGE_INVULN
+    },
+    tick: (f: Fighter, frame: number) => {
+      f.vx = frame <= DODGE_FRAMES ? f.facing * dir * DODGE_SPEED * (1 - frame / (DODGE_FRAMES * 1.25)) : 0
+    },
+  } satisfies ActionDef
+}
 
 /** 出拳時往前小踏一步，讓連擊跟得上被打退的敵人。 */
 const punchStep = (f: Fighter, frame: number) => {
@@ -66,19 +81,10 @@ export const MOVES = {
       f.vx = frame >= 4 && frame <= 9 ? f.facing * 1.4 : 0
     },
   },
-  /** ↓+空白：往前翻滾，途中短暫無敵，可以穿過敵人。 */
-  roll: {
-    clip: still(POSES.tuck),
-    length: ROLL_FRAMES + 4,
-    onStart: (f) => {
-      f.invuln = ROLL_INVULN
-    },
-    tick: (f, frame) => {
-      f.vx = frame <= ROLL_FRAMES ? f.facing * ROLL_SPEED * (1 - frame / (ROLL_FRAMES * 1.6)) : 0
-      // 整個身體轉一圈
-      f.rotation = frame < ROLL_FRAMES ? f.facing * Math.PI * 2 * (frame / ROLL_FRAMES) : 0
-    },
-  },
+  /** Left Shift：往身後閃（沒按方向，或按著身後的方向）。 */
+  dodgeBack: dodge(ATTACK_POSES.dodgeBack, -1),
+  /** Left Shift + 面向的方向：往前閃，可以閃過敵人。 */
+  dodgeForward: dodge(ATTACK_POSES.dodgeForward, 1),
   /** ↑+Z：上勾拳把雜兵打上空中；收招時可按跳取消，跳起來追擊。 */
   launcher: {
     clip: attackClip(ATTACK_POSES.punch3, 4, 6, 16),

@@ -15,7 +15,14 @@ export function makeStrip(move: string): (ctx: CanvasRenderingContext2D) => void
   w.enemies = [g]
   const t = (p: Button[] = [], h: Button[] = []) => w.update({ pressed: p, held: new Set([...h, ...p]) })
   t(['grab']); for (let i = 0; i < 6; i++) t()
-  if (move === 'suplex') t(['kick'], ['left']); else t(['jump'])
+  // 過肩摔：後 + K；大風車：前 → 後 → 前 + K
+  if (move === 'suplex') t(['kick'], ['left'])
+  else {
+    t(['right'])
+    t(['left'])
+    t(['right'])
+    t(['kick'])
+  }
   const snap = (f: Fighter) => ({ x: f.x, h: f.h, rotation: f.rotation, pose: f.pose(), facing: f.facing, squash: f.squash ? { ...f.squash } : null })
   const frames: { a: ReturnType<typeof snap>; g: ReturnType<typeof snap> }[] = []
   for (let i = 0; i < 56; i++) { frames.push({ a: snap(w.agent), g: snap(g) }); t() }

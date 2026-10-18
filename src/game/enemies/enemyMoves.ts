@@ -1,5 +1,21 @@
-import type { ActionDef } from '../combat/types'
-import { ATTACK_POSES, attackClip } from '../stickman/poses'
+import type { ActionDef, HitSpec } from '../combat/types'
+import { ATTACK_POSES, POSES, attackClip } from '../stickman/poses'
+
+/** 雜兵抓住特務後：每隔幾幀膝撞一次、撞幾下後摔出去；特務狂按幾下可以掙脫。 */
+export const ENEMY_HOLD = { kneeEvery: 28, knees: 3, throwAt: 100, escapePresses: 10, kneeShow: 8 } as const
+const holdSpec = (damage: number, extra: Partial<HitSpec> = {}): HitSpec => ({
+  from: 0,
+  to: 0,
+  box: { forward: 0, up: 0, w: 1, h: 1 },
+  damage,
+  hitstun: 16,
+  knockback: 0,
+  ...extra,
+})
+export const ENEMY_HOLD_HITS = {
+  knee: holdSpec(6, { holdHit: true }),
+  throw: holdSpec(10, { hitstun: 20, knockback: 3, knockdown: true, heavy: true }),
+} as const
 
 /** 特務被踢到下體時摀著彎腰的幀數（比雜兵短，約 0.75 秒）。 */
 export const AGENT_GROIN_STUN = 45
@@ -30,6 +46,13 @@ export const ENEMY_MOVES = {
     length: 30,
     range: 26,
     hit: { from: 14, to: 17, box: { forward: 2, up: 14, w: 24, h: 12 }, damage: 5, hitstun: AGENT_GROIN_STUN, knockback: 0.3, groin: true },
+  },
+  /** 壯漢伸手抓特務（起手 12 幀看得到）：抓到就膝撞、最後摔出去。 */
+  grab: {
+    clip: attackClip([POSES.idleA, ATTACK_POSES.clinch[0]], 12, 4, 14),
+    length: 30,
+    range: 22,
+    hit: { from: 12, to: 15, box: { forward: 0, up: 10, w: 22, h: 32 }, damage: 0, hitstun: 0, knockback: 0, grab: true },
   },
   thrust: {
     clip: attackClip(ATTACK_POSES.dashPunch, 16, 10, 14, undefined, 10),

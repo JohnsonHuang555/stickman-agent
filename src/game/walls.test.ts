@@ -24,51 +24,55 @@ function sandbox(x = 300) {
 
 const KNOCKDOWN: HitSpec = { from: 0, to: 0, box: { forward: 0, up: 0, w: 1, h: 1 }, damage: 1, hitstun: 20, knockback: 3, knockdown: true }
 
-describe('roll (↓ + space)', () => {
-  it('rolls forward about 60px instead of jumping', () => {
+describe('dodge step (Left Shift)', () => {
+  it('Shift alone steps back about 40–55px, keeps facing forward, never leaves the ground', () => {
     const { world, agent } = sandbox()
-    tick(world, ['jump'], ['down'])
+    tick(world, ['dodge'])
     let maxH = 0
-    for (let i = 0; i < 30; i++) {
-      tick(world, [], ['down'])
+    for (let i = 0; i < 25; i++) {
+      tick(world)
       maxH = Math.max(maxH, agent.h)
     }
     expect(maxH).toBe(0)
-    expect(agent.x - 300).toBeGreaterThan(45)
-    expect(agent.x - 300).toBeLessThan(80)
+    expect(agent.facing).toBe(1)
+    expect(300 - agent.x).toBeGreaterThan(40)
+    expect(300 - agent.x).toBeLessThan(55)
   })
 
-  it('rolls toward the held direction', () => {
-    const { world, agent } = sandbox()
-    tick(world, ['jump'], ['down', 'left'])
-    run(world, 25, ['down'])
-    expect(agent.facing).toBe(-1)
-    expect(agent.x).toBeLessThan(260)
+  it('Shift + the facing direction steps forward; Shift + the other way steps back without turning around', () => {
+    const fwd = sandbox()
+    tick(fwd.world, ['dodge'], ['right'])
+    run(fwd.world, 20)
+    expect(fwd.agent.x).toBeGreaterThan(340)
+    expect(fwd.agent.facing).toBe(1)
+
+    const back = sandbox()
+    tick(back.world, ['dodge'], ['left'])
+    run(back.world, 20)
+    expect(back.agent.x).toBeLessThan(260)
+    expect(back.agent.facing).toBe(1)
   })
 
-  it('is invulnerable and low for most of the roll, then turns upright again', () => {
+  it('is invulnerable for most of the step, then vulnerable again', () => {
     const { world, agent } = sandbox()
-    tick(world, ['jump'], ['down'])
-    run(world, 6)
+    tick(world, ['dodge'])
+    run(world, 4)
     expect(agent.invuln).toBeGreaterThan(0)
-    expect(agent.hurtbox()!.h).toBeLessThan(35)
-    expect(agent.rotation).not.toBe(0)
-    run(world, 30)
+    run(world, 20)
     expect(agent.invuln).toBe(0)
-    expect(agent.rotation).toBe(0)
   })
 
-  it('rolling through an attacking heavy takes no damage', () => {
+  it('stepping forward through an attacking heavy takes no damage', () => {
     const { world, agent } = sandbox(300)
     const heavy = new Grunt(330, 'heavy', { moves: ['slam'], held: null })
     world.enemies = [heavy]
     for (let i = 0; i < 400 && !heavy.attacking; i++) tick(world)
     expect(heavy.attacking).toBe(true)
-    run(world, 12) // 等重砸快落下時才滾
-    tick(world, ['jump'], ['down', 'right'])
-    run(world, 20, ['down'])
+    run(world, 14) // 等重砸快落下時才閃
+    agent.facing = heavy.x > agent.x ? 1 : -1
+    tick(world, ['dodge'], [agent.facing === 1 ? 'right' : 'left'])
+    run(world, 16)
     expect(agent.life.hp).toBe(agent.life.max)
-    expect(agent.x).toBeGreaterThan(heavy.x) // 滾到壯漢身後
   })
 })
 

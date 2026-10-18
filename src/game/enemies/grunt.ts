@@ -5,10 +5,12 @@ import type { ItemEntity } from '../items/itemEntity'
 import { categoryOf, newItem, type Item } from '../items/itemTypes'
 import { LifePool } from '../life/lifePool'
 import { STAND_HEIGHT, type Palette, type Pose } from '../stickman/pose'
-import { CLIPS, walkPose } from '../stickman/poses'
+import { ATTACK_POSES, CLIPS, walkPose } from '../stickman/poses'
+import { GROUND_Y } from '../constants'
 import type { World } from '../world'
+import type { Agent } from '../agent/agent'
 import { Enemy } from './enemy'
-import { ENEMY_MOVES, type EnemyMoveId } from './enemyMoves'
+import { ENEMY_HOLD, ENEMY_HOLD_HITS, ENEMY_MOVES, type EnemyMoveId } from './enemyMoves'
 import { ENEMY_TYPES, randomPalette, type EnemyType } from './enemyTypes'
 
 const DOWN_FRAMES = 40
@@ -59,6 +61,7 @@ type GruntState =
   | 'hurt'
   | 'groin'
   | 'grabbed'
+  | 'holding'
   | 'launched'
   | 'juggled'
   | 'down'
@@ -205,6 +208,9 @@ export class Grunt extends Enemy {
       case 'groin':
         this.vx *= 0.8
         if (this.stateFrame >= this.hitstun) this.setState('wait')
+        break
+      case 'holding':
+        this.updateHolding(world)
         break
       case 'grabbed':
         // 被特務抓著：位置、旋轉都由特務決定
@@ -523,6 +529,59 @@ export class Grunt extends Enemy {
     this.setState('down')
   }
 
+  /** 抓住特務：之後每隔一段時間膝撞，最後摔出去。 */
+  private holdTarget: Agent | null = null
+
+  beginHolding(agent: Agent): void {
+    this.act = null
+    this.planned = null
+    this.vx = 0
+    this.holdTarget = agent
+    this.setState('holding')
+    this.placeHeld()
+  }
+
+  /** 正抓著特務。 */
+  get holding(): boolean {
+    return this.state === 'holding'
+  }
+
+  /** 特務狂按掙脫：被推開、踉蹌一下。 */
+  shovedOff(dir: Facing): void {
+    if (this.state !== 'holding') return
+    this.holdTarget = null
+    this.setState('hurt')
+    this.hitstun = 24
+    this.vx = dir * 2
+  }
+
+  private placeHeld(): void {
+    const a = this.holdTarget
+    if (!a) return
+    a.x = this.x + this.facing * 14 * this.scale
+    a.facing = (-this.facing) as Facing
+  }
+
+  private updateHolding(world: World): void {
+    const a = this.holdTarget
+    this.vx = 0
+    // 特務已經不在手上（掙脫、被別人打到、被摔出去）
+    if (!a || a.heldBy !== this) {
+      this.holdTarget = null
+      if (this.state === 'holding') this.setState('retreat')
+      return
+    }
+    this.placeHeld()
+    const f = this.stateFrame
+    const hitAt = (spec: typeof ENEMY_HOLD_HITS.knee | typeof ENEMY_HOLD_HITS.throw) =>
+      world.landHit(this, a, spec, this.facing, a.x, GROUND_Y - a.h - 22)
+    if (f === ENEMY_HOLD.throwAt) {
+      hitAt(ENEMY_HOLD_HITS.throw)
+      return
+    }
+    if (f % ENEMY_HOLD.kneeEvery === 0 && f / ENEMY_HOLD.kneeEvery <= ENEMY_HOLD.knees) hitAt(ENEMY_HOLD_HITS.knee)
+  }
+
   /** 掙脫（抓太久、特務被打）：往後退開，短暫硬直。 */
   breakFree(awayFrom: number): void {
     if (this.state !== 'grabbed') return
@@ -573,6 +632,12 @@ export class Grunt extends Enemy {
       case 'hurt':
       case 'grabbed':
         return this.heldPose ?? CLIPS.hurt.sample(0)
+      case 'holding': {
+        // 抓著特務：平常雙手抓著，膝撞的那幾幀抬膝；最後摔出去
+        const sinceKnee = this.stateFrame % ENEMY_HOLD.kneeEvery
+        if (this.stateFrame >= ENEMY_HOLD.throwAt - 8) return ATTACK_POSES.grabThrow[0]
+        return this.stateFrame >= ENEMY_HOLD.kneeEvery && sinceKnee < ENEMY_HOLD.kneeShow ? ATTACK_POSES.knee[1] : ATTACK_POSES.clinch[0]
+      }
       case 'groin':
         return CLIPS.groin.sample(this.stateFrame)
       case 'launched':

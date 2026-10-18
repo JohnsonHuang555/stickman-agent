@@ -64,8 +64,6 @@ if (import.meta.env.DEV && params.has('scene')) {
   import('./dev/sceneGallery').then(({ sceneGallery }) => showStatic(sceneGallery(floor, camX, combo)))
 } else if (import.meta.env.DEV && params.has('walk')) {
   import('./dev/walkGallery').then(({ drawWalkGallery }) => showStatic(drawWalkGallery))
-} else if (import.meta.env.DEV && params.has('roll')) {
-  import('./dev/rollGallery').then(({ drawRollGallery }) => showStatic(drawRollGallery))
 } else if (import.meta.env.DEV && params.has('bosses')) {
   import('./dev/bossGallery').then(({ drawBossGallery }) => showStatic(drawBossGallery))
 } else if (import.meta.env.DEV && params.has('items')) {

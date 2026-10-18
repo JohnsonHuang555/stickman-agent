@@ -30,14 +30,18 @@ const DESPERATION_BUTTONS: readonly Button[] = ['punch', 'kick', 'grab']
 export const DOUBLE_TAP_WINDOW = 14
 /** 快速連按兩下 X（間隔不超過這麼多幀）就踢下體。 */
 export const DOUBLE_KICK_WINDOW = 10
+/** 挑空技：按 ↑ 之前這麼多幀內按過 ↓，才算「↓ 再 ↑」。 */
+export const LAUNCH_INPUT_WINDOW = 10
+/** 「↓ 再 ↑」之後等這麼多幀看有沒有接拳；沒接拳才起跳。 */
+export const LAUNCH_WAIT = 6
 
 export interface CommandContext {
   frame: number
   presses: readonly Press[]
   airborne: boolean
   crouching: boolean
-  /** 正按著 ↑（挑空技）。 */
-  up?: boolean
+  /** 剛輸入「↓ 再 ↑」（S → W），接著按拳就是挑空技。 */
+  launchReady?: boolean
   /** 正按著 ↓（空中下砸拳）。 */
   down?: boolean
   /** 正在跑步的方向：Z 變衝刺拳、X 變跑步飛踢。 */
@@ -80,7 +84,7 @@ export function recognizeCommand(ctx: CommandContext): Command | null {
     const kickedJustNow = ctx.presses.some((p) => p.button === 'kick' && p.frame < ctx.frame && ctx.frame - p.frame <= DOUBLE_KICK_WINDOW)
     return { kind: kickedJustNow ? 'groinKick' : 'kick' }
   }
-  if (ctx.up) return { kind: 'launcher' }
+  if (ctx.launchReady) return { kind: 'launcher' }
 
   const dir = doubleTapDirection(ctx.presses, ctx.frame)
   if (dir) return { kind: 'dashPunch', dir }

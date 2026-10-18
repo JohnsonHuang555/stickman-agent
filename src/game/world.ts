@@ -505,6 +505,16 @@ export class World {
    * (x, y) 是衝擊閃光的位置。一般攻擊與抓技（膝撞、摔、大風車）共用。
    */
   landHit(attacker: Hitter, target: Fighter, spec: HitSpec, dir: Facing, x: number, y: number, hitsAllies = false): void {
+    // 抓人：不是打擊，不出閃光與頓幀；抓成功就讓雜兵開始抓著特務
+    if (spec.grab) {
+      target.receiveHit(spec, dir, this)
+      if (target === this.agent && attacker instanceof Grunt && this.agent.isHeld) {
+        this.agent.heldBy = attacker
+        attacker.beginHolding(this.agent)
+        this.sound('pickup')
+      }
+      return
+    }
     const wasAlive = !target.life.isDead
     const wasJuggled = target instanceof Grunt && target.juggled
     const barsBefore = target.life.barsRemaining
@@ -821,7 +831,7 @@ export class World {
     ctx.font = '8px monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.fillText('C', x + 0.5, y)
+    ctx.fillText('L', x + 0.5, y)
   }
 
   private drawBoxes(ctx: CanvasRenderingContext2D, camX: number): void {

@@ -11,16 +11,26 @@ export type Button =
   | 'debug'
   | 'confirm'
   | 'bag'
+  | 'dodge'
 
+/**
+ * 鍵盤配置：WASD 移動（W 跳）、J 拳、K 踢、L 撿／丟／抓、Left Shift 閃身步、V 背包。
+ * 方向鍵也能移動與選單操作；沒有獨立的跳躍鍵（'jump' 只在程式內部與測試使用）。
+ */
 export const KEYMAP: Readonly<Record<string, Button>> = {
+  KeyA: 'left',
+  KeyD: 'right',
+  KeyW: 'up',
+  KeyS: 'down',
   ArrowLeft: 'left',
   ArrowRight: 'right',
   ArrowUp: 'up',
   ArrowDown: 'down',
-  KeyZ: 'punch',
-  KeyX: 'kick',
-  Space: 'jump',
-  KeyC: 'grab',
+  KeyJ: 'punch',
+  KeyK: 'kick',
+  KeyL: 'grab',
+  ShiftLeft: 'dodge',
+  ShiftRight: 'dodge',
   Escape: 'pause',
   KeyP: 'pause',
   Backquote: 'debug',

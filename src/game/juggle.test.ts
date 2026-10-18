@@ -14,6 +14,13 @@ function run(world: World, frames: number, held: Button[] = []) {
   for (let i = 0; i < frames; i++) tick(world, [], held)
 }
 
+/** 挑空技的輸入：S → W + J（↓ 再 ↑ 接拳）。 */
+function launchInput(world: World, held: Button[] = []) {
+  tick(world, ['down'], held)
+  tick(world, ['up'], held)
+  tick(world, ['punch'], held)
+}
+
 /** 特務面前站一個不會動、血很多的雜兵。 */
 function setup(type: 'thug' | 'heavy' = 'thug') {
   const world = new World({ mode: 'sandbox' })
@@ -28,10 +35,10 @@ const JAB: HitSpec = { from: 0, to: 0, box: { forward: 0, up: 0, w: 1, h: 1 }, d
 const LAUNCH: HitSpec = { ...JAB, launch: LAUNCH_VELOCITY }
 const SPIKE: HitSpec = { ...JAB, spike: true, knockdown: true }
 
-/** ↑+Z → 跳 → Z → Z → X，每步之間等對的幀數。 */
+/** S → W + J（挑空）→ 跳 → J → J → K，每步之間等對的幀數。 */
 function fullCombo(world: World) {
-  tick(world, ['punch'], ['up'])
-  run(world, 7, ['up'])
+  launchInput(world)
+  run(world, 7)
   tick(world, ['jump'])
   run(world, 8)
   tick(world, ['punch'])
@@ -45,7 +52,7 @@ function fullCombo(world: World) {
 describe('launcher', () => {
   it('↑+Z sends a grunt into the air', () => {
     const { world, grunt, damage } = setup()
-    tick(world, ['punch'], ['up'])
+    launchInput(world)
     let maxH = 0
     for (let i = 0; i < 40; i++) {
       tick(world)
@@ -138,7 +145,7 @@ describe('juggle exceptions', () => {
   it('with a weapon in hand, ↑+Z just swings the weapon (no launcher)', () => {
     const { world, grunt, damage } = setup()
     world.agent.held = newItem('bat')
-    tick(world, ['punch'], ['up'])
+    launchInput(world)
     run(world, 30)
     expect(damage()).toBe(14)
     expect(grunt.juggled).toBe(false)
@@ -186,7 +193,7 @@ describe('human-paced timing (regression for "the air combo is hard to land")', 
   /** 每一步之間等待的幀數：d1 挑空→跳、d2 跳→Z、d3 Z→Z、d4 Z→X */
   function attempt(type: 'thug' | 'heavy', d1: number, d2: number, d3: number, d4: number) {
     const { world, damage } = setup(type)
-    tick(world, ['punch'], ['up'])
+    launchInput(world)
     run(world, d1 - 1)
     tick(world, ['jump'])
     run(world, d2 - 1)
@@ -218,7 +225,7 @@ describe('human-paced timing (regression for "the air combo is hard to land")', 
 
   it('after an unchained air punch ends, there is still a short grace window to continue', () => {
     const { world, damage } = setup()
-    tick(world, ['punch'], ['up'])
+    launchInput(world)
     run(world, 7)
     tick(world, ['jump'])
     run(world, 8)
@@ -282,7 +289,8 @@ describe('holding a direction during the air combo', () => {
         tick(world, pressed, [...hold, ...extra])
         run(world, wait - 1, hold)
       }
-      step(['punch'], delays[0], ['up'])
+      launchInput(world, hold)
+      run(world, delays[0] - 1, hold)
       step(['jump'], delays[1])
       step(['punch'], delays[2])
       step(['punch'], delays[3])
@@ -293,7 +301,7 @@ describe('holding a direction during the air combo', () => {
 
   it('the agent never ends up inside or past a juggled enemy', () => {
     const { world, grunt } = setup()
-    tick(world, ['punch'], ['up', 'right'])
+    launchInput(world, ['right'])
     run(world, 6, ['right'])
     tick(world, ['jump'], ['right'])
     for (let i = 0; i < 30; i++) {

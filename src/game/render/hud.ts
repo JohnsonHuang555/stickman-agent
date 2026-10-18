@@ -167,7 +167,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     text(ctx, 'MISSION COMPLETE', VIEW_W / 2, VIEW_H / 2 - 30, 16, 'center')
     text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2, 8, 'center')
     if (world.phaseFrame > 60 && Math.floor(world.realFrame / 30) % 2 === 0) {
-      text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 24, 8, 'center')
+      text(ctx, 'PRESS J', VIEW_W / 2, VIEW_H / 2 + 24, 8, 'center')
     }
   }
 
@@ -179,7 +179,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World): void {
     text(ctx, `REACHED ${floorLabel(world.result.floor)}`, VIEW_W / 2, VIEW_H / 2 - 4, 8, 'center')
     text(ctx, `SCORE ${String(world.score).padStart(6, '0')}`, VIEW_W / 2, VIEW_H / 2 + 12, 8, 'center')
     if (world.phaseFrame > 60 && Math.floor(world.realFrame / 30) % 2 === 0) {
-      text(ctx, 'PRESS Z', VIEW_W / 2, VIEW_H / 2 + 34, 8, 'center')
+      text(ctx, 'PRESS J', VIEW_W / 2, VIEW_H / 2 + 34, 8, 'center')
     }
   }
 

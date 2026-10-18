@@ -30,6 +30,14 @@ function grabbed(gap = 16, type: 'thug' | 'heavy' = 'thug') {
 
 const lost = (g: Grunt) => 999 - g.life.hp
 
+/** 抓著（面向右）時輸入大風車：前 → 後 → 前 + K。 */
+function swingInput(world: World) {
+  tick(world, ['right'])
+  tick(world, ['left'])
+  tick(world, ['right'])
+  tick(world, ['kick'])
+}
+
 describe('grabbing (C)', () => {
   it('C in front of an enemy grabs it (no need to hit it first) and holds it at arm’s length', () => {
     const { world, g } = grabbed()
@@ -206,7 +214,7 @@ describe('grab moves', () => {
     const right = new Grunt(326, 'thug', { passive: true })
     for (const e of [left, right]) e.life.hp = 999
     world.enemies.push(left, right)
-    tick(world, ['jump'])
+    swingInput(world)
     let sidesSeen = new Set<number>()
     let maxInvuln = 0
     for (let i = 0; i < GRAB.swing.length + 10; i++) {
@@ -224,9 +232,14 @@ describe('grab moves', () => {
   })
 
   it('every grab move returns you to normal control afterwards', () => {
-    for (const [pressed, held] of [[['kick'], []], [['kick'], ['left']], [['jump'], []]] as [Button[], Button[]][]) {
+    const moves: ((world: World) => void)[] = [
+      (world) => tick(world, ['kick']),
+      (world) => tick(world, ['kick'], ['left']),
+      swingInput,
+    ]
+    for (const move of moves) {
       const { world } = grabbed()
-      tick(world, pressed, held)
+      move(world)
       run(world, 90)
       const x0 = world.agent.x
       run(world, 20, ['right'])
@@ -274,7 +287,7 @@ describe('grab animations (regression for "back + X and space look unnatural")',
 
   it('giant swing: headbutt, the enemy falls back head-first to the floor, feet lifted to your waist, head sweeps up, then flies up on release', () => {
     const { world, g } = grabbed()
-    tick(world, ['jump'])
+    swingInput(world)
     /** 被甩的人頭的中心離地多高（用實際姿勢轉完之後的位置）。 */
     const headHeight = () => {
       const pose = g.pose()
@@ -315,5 +328,53 @@ describe('grab animations (regression for "back + X and space look unnatural")',
     }
     expect(g.squash).toBeNull()
     expect(maxH).toBeGreaterThan(30) // 甩到空中
+  })
+})
+
+describe('giant swing input is deliberate (regression for "the giant swing is too easy to trigger")', () => {
+  /** 輸入之後看是不是大風車：大風車途中被甩的人會繞到特務身後。 */
+  function didSwing(input: (world: World) => void): boolean {
+    const { world, g } = grabbed()
+    input(world)
+    for (let i = 0; i < 60; i++) {
+      tick(world)
+      if (g.isGrabbed && g.x < world.agent.x) return true
+    }
+    return false
+  }
+
+  it('forward → back → forward + K is the giant swing', () => {
+    expect(didSwing(swingInput)).toBe(true)
+  })
+
+  it('K alone, or forward + K, is the forward throw', () => {
+    expect(didSwing((w) => tick(w, ['kick']))).toBe(false)
+    expect(didSwing((w) => {
+      tick(w, ['right'])
+      tick(w, ['kick'])
+    })).toBe(false)
+  })
+
+  it('only back → forward + K (two directions) is not enough', () => {
+    expect(didSwing((w) => {
+      tick(w, ['left'])
+      tick(w, ['right'])
+      tick(w, ['kick'])
+    })).toBe(false)
+  })
+
+  it('the three directions have to come quickly (within about 0.6 s)', () => {
+    expect(didSwing((w) => {
+      tick(w, ['right'])
+      run(w, 20)
+      tick(w, ['left'])
+      run(w, 20)
+      tick(w, ['right'])
+      tick(w, ['kick'])
+    })).toBe(false)
+  })
+
+  it('pressing up (W) while grabbing no longer starts the giant swing', () => {
+    expect(didSwing((w) => tick(w, ['up']))).toBe(false)
   })
 })
