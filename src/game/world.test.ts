@@ -63,7 +63,7 @@ describe('World simulation', () => {
     const { world, grunt } = arena()
     tick(world, ['punch', 'kick', 'grab'])
     run(world, 40)
-    expect(world.agent.life.hp).toBe(192)
+    expect(world.agent.life.hp).toBe(world.agent.life.max - 8)
     expect(grunt.life.max - grunt.life.hp).toBe(12)
   })
 
@@ -73,7 +73,7 @@ describe('World simulation', () => {
     run(world, 2, ['punch'])
     tick(world, ['kick', 'grab'], ['punch'])
     run(world, 40)
-    expect(world.agent.life.hp).toBe(192)
+    expect(world.agent.life.hp).toBe(world.agent.life.max - 8)
     expect(grunt.life.max - grunt.life.hp).toBe(12)
   })
 
@@ -83,7 +83,7 @@ describe('World simulation', () => {
     tick(world, ['grab'])
     tick(world, ['punch', 'kick'], ['grab'])
     run(world, 40)
-    expect(world.agent.life.hp).toBe(192)
+    expect(world.agent.life.hp).toBe(world.agent.life.max - 8)
     expect(world.agent.held).toBeNull()
     expect(grunt.life.max - grunt.life.hp).toBe(12)
   })

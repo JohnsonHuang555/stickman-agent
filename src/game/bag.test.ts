@@ -114,7 +114,7 @@ describe('bag: medkits', () => {
     world.placeItem('medkit', 300)
     tick(world)
     expect(agent.bag?.type).toBe('medkit')
-    expect(agent.life.hp).toBe(150)
+    expect(agent.life.hp).toBe(agent.life.max - 50)
   })
 
   it('an empty bag stores a medkit even at full life', () => {
@@ -126,7 +126,7 @@ describe('bag: medkits', () => {
 
   it('V uses the medkit: heals 40% and empties the bag', () => {
     const { world, agent } = sandbox()
-    agent.life.damage(130)
+    agent.life.damage(agent.life.max - 70) // 剩 70：補 40 會跨回上一條
     agent.bag = newItem('medkit')
     tick(world, ['bag'])
     expect(agent.life.hp).toBe(110)

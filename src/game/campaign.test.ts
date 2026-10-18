@@ -83,7 +83,7 @@ describe('campaign', () => {
   it('clearing a floor heals 20%, after the life bonus is counted', () => {
     const world = new World()
     clearAllZones(world)
-    world.agent.life.damage(110)
+    world.agent.life.damage(world.agent.life.max - 90)
     climbStairs(world)
     expect(world.clearBonus.life).toBe(90 * 20)
     expect(world.agent.life.hp).toBe(110)
@@ -106,13 +106,13 @@ describe('campaign', () => {
     const before = world.score
     climbStairs(world)
     expect(world.phase).toBe('clear')
-    expect(world.clearBonus.life).toBe(150 * 20)
+    expect(world.clearBonus.life).toBe((world.agent.life.max - 50) * 20)
     expect(world.score).toBe(before + world.clearBonus.life + world.clearBonus.time)
 
     run(world, 210)
     expect(world.floor?.label).toBe('2F')
     expect(world.phase).toBe('intro')
-    expect(world.agent.life.hp).toBe(150 + 20)
+    expect(world.agent.life.hp).toBe(world.agent.life.max - 50 + 20)
     expect(world.agent.held).toEqual({ type: 'katana', uses: 3 })
     expect(world.agent.x).toBe(40)
   })

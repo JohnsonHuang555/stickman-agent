@@ -80,7 +80,7 @@ describe('medkits and score items', () => {
   it('with the bag full, walking onto a medkit heals 40%, spilling over into the previous bar', () => {
     const world = sandbox()
     world.agent.bag = newItem('pistol') // 背包滿了才會直接補血
-    world.agent.life.damage(130)
+    world.agent.life.damage(world.agent.life.max - 70)
     world.placeItem('medkit', 340)
     run(world, 40, ['right'])
     expect(world.agent.life.hp).toBe(110)
@@ -95,7 +95,7 @@ describe('medkits and score items', () => {
     world.agent.life.damage(50)
     world.placeItem('medkit', 300)
     tick(world)
-    expect(world.agent.life.hp).toBe(190)
+    expect(world.agent.life.hp).toBe(world.agent.life.max - 10)
     expect(world.agent.held?.type).toBe('bat')
   })
 

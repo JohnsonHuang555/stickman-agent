@@ -96,7 +96,7 @@ export class Agent extends Fighter {
   private hitstun = 0
 
   constructor(x: number) {
-    super(x, new LifePool(2))
+    super(x, new LifePool(3))
   }
 
   /** 每個實際幀都呼叫（包含頓幀期間），只負責收集輸入。 */
