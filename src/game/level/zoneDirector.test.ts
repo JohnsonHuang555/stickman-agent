@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { WORLD_VIEW_W } from '../constants'
 import type { FloorDef } from './floors'
 import { SPAWN_STAGGER, WAVE_PAUSE, ZoneDirector } from './zoneDirector'
 
@@ -32,7 +33,7 @@ function runFor(d: ZoneDirector, from: number, frames: number, agentX: number, a
 describe('ZoneDirector', () => {
   it('does nothing before the agent reaches the middle of the first zone', () => {
     const d = new ZoneDirector(floor)
-    expect(runFor(d, 0, 100, 339, 0)).toEqual([])
+    expect(runFor(d, 0, 100, 100 + WORLD_VIEW_W / 2 - 1, 0)).toEqual([])
     expect(d.locked).toBe(false)
   })
 

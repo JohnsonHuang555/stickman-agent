@@ -3,7 +3,7 @@ import { CLEARED_FLOOR } from '../leaderboard/leaderboard'
 import { Agent } from './agent/agent'
 import { ComboCounter } from './combat/comboCounter'
 import { overlaps, type HitSpec, type Hitter } from './combat/types'
-import { GROUND_Y, VIEW_W } from './constants'
+import { GROUND_Y, WORLD_VIEW_W, WORLD_ZOOM } from './constants'
 import { AttackSlots } from './enemies/attackSlots'
 import { Boss } from './enemies/boss'
 import { Enemy } from './enemies/enemy'
@@ -311,7 +311,7 @@ export class World {
   /** 從目前畫面（或鎖定區段）的左右邊緣外出場。 */
   spawn(spawn: Spawn): void {
     const left = this.director?.lockLeft ?? this.camX
-    const x = Math.min(this.floorWidth - 8, Math.max(8, spawn.side === 'left' ? left - 16 : left + VIEW_W + 16))
+    const x = Math.min(this.floorWidth - 8, Math.max(8, spawn.side === 'left' ? left - 16 : left + WORLD_VIEW_W + 16))
     if ('boss' in spawn) {
       const boss = new Boss(x, spawn.boss)
       this.enemies.push(boss)
@@ -332,7 +332,7 @@ export class World {
   private confineToLock(): void {
     const left = this.director?.lockLeft
     if (left === null || left === undefined) return
-    const right = left + VIEW_W
+    const right = left + WORLD_VIEW_W
     this.agent.x = Math.min(right - 8, Math.max(left + 8, this.agent.x))
     for (const g of this.enemies) {
       if (g.x > left + 8 && g.x < right - 8) g.entered = true
@@ -342,8 +342,8 @@ export class World {
 
   private updateCamera(): void {
     const lock = this.director?.lockLeft
-    const target = lock ?? this.agent.x - VIEW_W / 2
-    const clamped = Math.min(this.floorWidth - VIEW_W, Math.max(0, target))
+    const target = lock ?? this.agent.x - WORLD_VIEW_W / 2
+    const clamped = Math.min(this.floorWidth - WORLD_VIEW_W, Math.max(0, target))
     this.camX += (clamped - this.camX) * 0.15
   }
 
@@ -495,7 +495,7 @@ export class World {
   /** 牆的位置：鎖定區段時是畫面左右邊緣，否則是樓層兩端。 */
   wallBounds(): { left: number; right: number } {
     const lock = this.director?.lockLeft
-    if (lock !== null && lock !== undefined) return { left: lock + 8, right: lock + VIEW_W - 8 }
+    if (lock !== null && lock !== undefined) return { left: lock + 8, right: lock + WORLD_VIEW_W - 8 }
     return { left: 8, right: this.floorWidth - 8 }
   }
 
@@ -734,7 +734,7 @@ export class World {
       this.itemRespawnAt = this.realFrame + 300
     } else if (this.realFrame >= this.itemRespawnAt) {
       const type = TRAINING_ITEMS[Math.floor(Math.random() * TRAINING_ITEMS.length)]
-      this.placeItem(type, this.camX + 40 + Math.random() * (VIEW_W - 80))
+      this.placeItem(type, this.camX + 40 + Math.random() * (WORLD_VIEW_W - 80))
       this.itemRespawnAt = this.realFrame + 300
     }
   }
@@ -747,6 +747,10 @@ export class World {
       ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake))
     }
     const camX = this.applySlowmoDisplay()
+    // 鏡頭拉近：以地面為基準放大，地面維持在畫面同一個高度，上方（天花板）被裁掉
+    ctx.translate(0, GROUND_Y)
+    ctx.scale(WORLD_ZOOM, WORLD_ZOOM)
+    ctx.translate(0, -GROUND_Y)
     this.fx.applyZoom(ctx, camX, this.realFrame)
     drawBackground(ctx, this.theme, camX, this.floor && !this.floor.final ? this.floor.stairsX : null, this.realFrame)
     for (const c of this.crates) c.draw(ctx, camX)

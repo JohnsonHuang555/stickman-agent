@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MOVES } from './agent/moves'
 import { Grunt } from './enemies/grunt'
 import type { Button } from './input/buttons'
-import { CROUCH_HEIGHT, posePoints } from './stickman/pose'
+import { BODY, CROUCH_HEIGHT, posePoints } from './stickman/pose'
 import { ATTACK_POSES, POSES } from './stickman/poses'
 import { World } from './world'
 
@@ -141,7 +141,7 @@ describe('crouch attack follow-ups (regression for "crouch punch flashes the sta
   it('the sweeping foot reaches far forward, skimming the floor', () => {
     const pts = posePoints(ATTACK_POSES.sweep[1])
     const [footX, footUp] = pts[7]
-    expect(footX).toBeGreaterThan(20)
+    expect(footX).toBeGreaterThan((BODY.thigh + BODY.shin) * 0.8) // 整條腿幾乎伸直往前
     expect(footUp).toBeLessThan(3)
   })
 })

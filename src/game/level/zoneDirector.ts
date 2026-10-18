@@ -1,4 +1,4 @@
-import { VIEW_W } from '../constants'
+import { WORLD_VIEW_W } from '../constants'
 import type { FloorDef, Spawn, ZoneDef } from './floors'
 
 /** 同一波敵人之間錯開出場的幀數。 */
@@ -41,19 +41,19 @@ export class ZoneDirector {
   /** 下一個區段的觸發點（或樓梯）。 */
   get nextTarget(): number {
     const next = this.floor.zones[this.zoneIndex + 1]
-    return next ? next.start + VIEW_W / 2 : this.floor.stairsX
+    return next ? next.start + WORLD_VIEW_W / 2 : this.floor.stairsX
   }
 
   /** 剛清完一個區段、還沒走到下一個目標時顯示「GO →」。 */
   showGo(agentX: number): boolean {
-    return !this.locked && this.zoneIndex >= 0 && agentX < this.nextTarget - VIEW_W / 2
+    return !this.locked && this.zoneIndex >= 0 && agentX < this.nextTarget - WORLD_VIEW_W / 2
   }
 
   /** 每幀呼叫；回傳本幀該出場的敵人。enemiesAlive 不含正在消失的。 */
   update(frame: number, agentX: number, enemiesAlive: number): Spawn[] {
     if (!this.locked) {
       const next = this.floor.zones[this.zoneIndex + 1]
-      if (next && agentX >= next.start + VIEW_W / 2) {
+      if (next && agentX >= next.start + WORLD_VIEW_W / 2) {
         this.zoneIndex++
         this.locked = true
         this.wave = 0

@@ -15,25 +15,8 @@ export interface Pose {
   lift: number
 }
 
-/** 約 5.5 頭身、身高約 48px：頭小、手腳長，翻滾與踢腿比較有張力。 */
+/** Q 版比例：頭稍大、短手短腳，身高約 43px（遊戲畫面再整體放大 1.25 倍顯示）。 */
 export const BODY = {
-  headR: 4.5,
-  neck: 1.5,
-  torso: 14.5,
-  upperArm: 9.5,
-  foreArm: 9.5,
-  thigh: 11.5,
-  shin: 11.5,
-}
-
-/** 手腳與軀幹的線條粗細。 */
-export let LINE_WIDTH = 3.4
-
-/**
- * Q 版（約 4 頭身）試看：網址加上 ?chibi 就換成頭稍大、短手短腳的比例。
- * 身高維持約 48px，受擊框與判定都不變，只有外觀比例不同。
- */
-const CHIBI_BODY: typeof BODY = {
   headR: 5.3,
   neck: 1.5,
   torso: 13.5,
@@ -41,11 +24,10 @@ const CHIBI_BODY: typeof BODY = {
   foreArm: 7,
   thigh: 8.5,
   shin: 8.5,
-}
-if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('chibi')) {
-  Object.assign(BODY, CHIBI_BODY)
-  LINE_WIDTH = 3.8
-}
+} as const
+
+/** 手腳與軀幹的線條粗細。 */
+export const LINE_WIDTH = 3.8
 
 /** 站立時的身高（受擊框用）。 */
 export const STAND_HEIGHT = 46

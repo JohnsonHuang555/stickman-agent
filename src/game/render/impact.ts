@@ -1,4 +1,4 @@
-import { GROUND_Y, VIEW_H, VIEW_W } from '../constants'
+import { GROUND_Y, VIEW_H, VIEW_W, WORLD_VIEW_W } from '../constants'
 
 /** 打中瞬間的衝擊閃光持續幀數（輕擊／重擊）。 */
 export const SPARK_FRAMES = { light: 7, heavy: 12 } as const
@@ -75,7 +75,7 @@ export class ImpactFx {
   applyZoom(ctx: CanvasRenderingContext2D, camX: number, frame: number): void {
     const amount = this.zoomAmount(frame)
     if (amount <= 1 || !this.zoom) return
-    const fx = Math.min(VIEW_W, Math.max(0, this.zoom.x - camX))
+    const fx = Math.min(WORLD_VIEW_W, Math.max(0, this.zoom.x - camX))
     const fy = Math.min(GROUND_Y, Math.max(VIEW_H * 0.4, this.zoom.y))
     ctx.translate(fx, fy)
     ctx.scale(amount, amount)

@@ -5,7 +5,7 @@ import type { Button } from './input/buttons'
 import { SIMULTANEOUS_WINDOW } from './input/commands'
 import { newItem } from './items/itemTypes'
 import { GROUND_Y } from './constants'
-import { frontHand, poseBall, posePoints, spinPivot } from './stickman/pose'
+import { STAND_HEIGHT, frontHand, poseBall, posePoints, spinPivot } from './stickman/pose'
 import { World } from './world'
 
 function tick(world: World, pressed: Button[] = [], held: Button[] = []) {
@@ -195,7 +195,7 @@ describe('grab moves', () => {
       maxH = Math.max(maxH, g.h)
       wentBehind ||= g.x < world.agent.x
     }
-    expect(maxH).toBeGreaterThan(35) // 舉過頭
+    expect(maxH).toBeGreaterThan(STAND_HEIGHT * 0.6) // 舉過頭（被舉的人腳比特務肩膀高）
     expect(wentBehind).toBe(true)
     expect(lost(g)).toBe(16)
     expect(world.agent.facing).toBe(1) // 特務本身不轉身
